@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    // Compile for Javascript version ES2021, which is the version supported by Node 16
+    // (the version of Node currently used by many Betterez services)
+    "lib": ["ES2021"],
+    "target": "ES2021",
+    "module": "Node16",
+
+    "outDir": "dist",
+    "sourceMap": true,
+    "declaration": true,
+
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+  },
+  "include": ["src/**/*"],
+  "exclude": ["test/*"]
+}

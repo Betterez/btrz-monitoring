@@ -45,5 +45,4 @@ export function initializeTracing(options: TracingOptions) {
   }
 
   process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
 }

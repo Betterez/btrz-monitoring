@@ -73,6 +73,5 @@ function initializeTracing(options) {
         }
     };
     node_process_1.default.on("SIGTERM", shutdown);
-    node_process_1.default.on("SIGINT", shutdown);
 }
 //# sourceMappingURL=tracing.js.map

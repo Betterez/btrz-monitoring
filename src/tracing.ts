@@ -1,6 +1,7 @@
 import process from "node:process";
-
-import opentelemetry from "@opentelemetry/sdk-node";
+import * as util from "node:util";
+import chalk from "chalk";
+import {NodeSDK} from "@opentelemetry/sdk-node";
 import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-node";
 import {OTLPTraceExporter} from "@opentelemetry/exporter-trace-otlp-proto";
 import {resourceFromAttributes} from "@opentelemetry/resources";
@@ -22,7 +23,7 @@ export function initializeTracing(options: TracingOptions) {
   const traceExporter = new OTLPTraceExporter({
     url: traceDestinationUrl
   });
-  const sdk = new opentelemetry.NodeSDK({
+  const sdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName
     }),
@@ -32,14 +33,17 @@ export function initializeTracing(options: TracingOptions) {
 
   sdk.start();
 
-  process.on("SIGTERM", async () => {
+  const shutdown = async () => {
     try {
       await sdk.shutdown();
-      console.log("[btrz-monitoring] Tracing stopped");
-    } catch (error) {
-      console.error("[btrz-monitoring] Error while stopping tracing", error);
-    } finally {
       process.exit(0);
+    } catch (error) {
+      console.error(chalk.red("[btrz-monitoring] Error while stopping tracing"));
+      console.error(chalk.red(util.inspect(error)));
+      process.exit(1);
     }
-  });
+  }
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }

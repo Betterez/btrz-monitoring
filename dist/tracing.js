@@ -37,19 +37,29 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeTracing = initializeTracing;
+const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
 const util = __importStar(require("node:util"));
 const chalk_1 = __importDefault(require("chalk"));
+const lodash_1 = require("lodash");
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
 const exporter_trace_otlp_proto_1 = require("@opentelemetry/exporter-trace-otlp-proto");
 const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
+// This must be executed before any other code (including "require" / "import" statements) or the tracing
+// instrumentation may not be installed
 function initializeTracing(options) {
     if (node_process_1.default.env.NODE_ENV === "test") {
         return;
     }
-    const { serviceName, traceDestinationUrl } = options;
+    const { serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests } = options;
+    const incomingHttpRequestUrlsToIgnore = [
+        ...getRegularExpressionsMatchingAllContentsOfDirectory(ignoreStaticAssetDir),
+        /^\/__webpack_hmr/ // Ignore requests made by webpack hot-reload tooling
+    ];
+    setEnabledInstrumentations();
     const traceExporter = new exporter_trace_otlp_proto_1.OTLPTraceExporter({
         url: traceDestinationUrl
     });
@@ -58,10 +68,72 @@ function initializeTracing(options) {
             [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
         }),
         traceExporter,
-        instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)()]
+        instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({
+                "@opentelemetry/instrumentation-fs": {
+                    enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().
+                    requireParentSpan: true
+                },
+                "@opentelemetry/instrumentation-http": {
+                    ignoreIncomingRequestHook(req) {
+                        debugger;
+                        if (incomingHttpRequestUrlsToIgnore.some(regex => regex.test(req.url ?? ""))) {
+                            return true;
+                        }
+                        else if (ignoreHttpOptionsRequests && req.method === "OPTIONS") {
+                            return true;
+                        }
+                        return false;
+                    }
+                }
+            })]
     });
     sdk.start();
-    const shutdown = async () => {
+    node_process_1.default.on("SIGTERM", shutdown(sdk));
+}
+function getRegularExpressionsMatchingAllContentsOfDirectory(directory) {
+    if (!directory) {
+        return [];
+    }
+    const allContentsOfDirectory = fs.readdirSync(directory);
+    const regularExpressions = allContentsOfDirectory.map((entry) => {
+        const pathToEntry = path.join(directory, entry);
+        const stats = fs.lstatSync(pathToEntry);
+        if (stats.isDirectory()) {
+            return new RegExp(`^\/${(0, lodash_1.escapeRegExp)(entry)}\/`);
+        }
+        else if (stats.isFile()) {
+            return new RegExp(`^\/${(0, lodash_1.escapeRegExp)(entry)}$`);
+        }
+        else {
+            return undefined;
+        }
+    }).filter(entry => entry !== undefined);
+    return regularExpressions;
+}
+// Work around a bug in the open telemetry library where the "@opentelemetry/instrumentation-fs" instrumentation
+// cannot be enabled via the instrumentation config.  Instead, it must be enabled by setting an environment variable.
+// https://github.com/open-telemetry/opentelemetry-js-contrib/issues/2515
+function setEnabledInstrumentations() {
+    if (!node_process_1.default.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS) {
+        node_process_1.default.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS = [
+            "amqplib", "aws-lambda", "aws-sdk",
+            "bunyan", "cassandra-driver", "connect",
+            "cucumber", "dataloader", "dns",
+            "express", "fs", "generic-pool",
+            "graphql", "grpc", "hapi",
+            "http", "ioredis", "kafkajs",
+            "knex", "koa", "lru-memoizer",
+            "memcached", "mongodb", "mongoose",
+            "mysql2", "mysql", "nestjs-core",
+            "net", "pg", "pino",
+            "redis", "redis-4", "restify",
+            "router", "socket.io", "tedious",
+            "undici", "winston"
+        ].join(",");
+    }
+}
+function shutdown(sdk) {
+    return async () => {
         try {
             await sdk.shutdown();
             node_process_1.default.exit(0);
@@ -72,6 +144,5 @@ function initializeTracing(options) {
             node_process_1.default.exit(1);
         }
     };
-    node_process_1.default.on("SIGTERM", shutdown);
 }
 //# sourceMappingURL=tracing.js.map

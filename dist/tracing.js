@@ -45,7 +45,7 @@ const chalk_1 = __importDefault(require("chalk"));
 const lodash_1 = require("lodash");
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
-const exporter_trace_otlp_proto_1 = require("@opentelemetry/exporter-trace-otlp-proto");
+const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
 const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
@@ -60,7 +60,7 @@ function initializeTracing(options) {
         /^\/__webpack_hmr/ // Ignore requests made by webpack hot-reload tooling
     ];
     setEnabledInstrumentations();
-    const traceExporter = new exporter_trace_otlp_proto_1.OTLPTraceExporter({
+    const traceExporter = new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
         url: traceDestinationUrl
     });
     const sdk = new sdk_node_1.NodeSDK({

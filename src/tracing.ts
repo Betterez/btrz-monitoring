@@ -9,8 +9,10 @@ import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-
 import {OTLPTraceExporter} from "@opentelemetry/exporter-trace-otlp-grpc";
 import {resourceFromAttributes} from "@opentelemetry/resources";
 import {ATTR_SERVICE_NAME} from "@opentelemetry/semantic-conventions";
+import {BatchSpanProcessor} from "@opentelemetry/sdk-trace-base";
 
 interface TracingOptions {
+  enabled?: boolean;
   serviceName: string;
   traceDestinationUrl: string;
   ignoreStaticAssetDir?: string;
@@ -20,11 +22,11 @@ interface TracingOptions {
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 export function initializeTracing(options: TracingOptions) {
-  if (process.env.NODE_ENV === "test") {
+  const {enabled, serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests} = options;
+
+  if (enabled === false || process.env.NODE_ENV === "test") {
     return;
   }
-
-  const {serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests} = options;
 
   const incomingHttpRequestUrlsToIgnore = [
     ...getRegularExpressionsMatchingAllContentsOfDirectory(ignoreStaticAssetDir),
@@ -37,11 +39,16 @@ export function initializeTracing(options: TracingOptions) {
     url: traceDestinationUrl
   });
 
+  const spanProcessor = new BatchSpanProcessor(traceExporter, {
+    maxExportBatchSize: 4096,
+    maxQueueSize: 8192
+  });
+
   const sdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName
     }),
-    traceExporter,
+    spanProcessors: [spanProcessor],
     instrumentations: [getNodeAutoInstrumentations({
       "@opentelemetry/instrumentation-fs": {
         enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().
@@ -49,7 +56,6 @@ export function initializeTracing(options: TracingOptions) {
       },
       "@opentelemetry/instrumentation-http": {
         ignoreIncomingRequestHook(req) {
-          debugger;
           if (incomingHttpRequestUrlsToIgnore.some(regex => regex.test(req.url ?? ""))) {
             return true;
           } else if (ignoreHttpOptionsRequests && req.method === "OPTIONS") {

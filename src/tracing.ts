@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import * as fs from "node:fs";
+import { IncomingMessage } from "node:http";
 import * as path from "node:path";
 import process from "node:process";
 import * as util from "node:util";
@@ -18,7 +19,15 @@ interface TracingOptions {
   samplePercentage?: number;
   traceDestinationUrl: string;
   ignoreStaticAssetDir?: string;
-  ignoreHttpOptionsRequests?: boolean;
+  ignoredHttpMethods?: HttpMethod[];
+  ignoredRoutes?: HttpRoute[];
+}
+
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
+
+type HttpRoute = {
+  method: HttpMethod;
+  url: string | RegExp;
 }
 
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
@@ -30,7 +39,8 @@ export function initializeTracing(options: TracingOptions) {
     samplePercentage = 100,
     traceDestinationUrl,
     ignoreStaticAssetDir,
-    ignoreHttpOptionsRequests = false
+    ignoredHttpMethods = [],
+    ignoredRoutes = []
   } = options;
 
   assert(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
@@ -70,7 +80,9 @@ export function initializeTracing(options: TracingOptions) {
         ignoreIncomingRequestHook(req) {
           if (incomingHttpRequestUrlsToIgnore.some(regex => regex.test(req.url ?? ""))) {
             return true;
-          } else if (ignoreHttpOptionsRequests && req.method === "OPTIONS") {
+          } else if (ignoredHttpMethods.includes(req.method as HttpMethod)) {
+            return true;
+          } else if (routeIsExplicitlyIgnored(ignoredRoutes, req)) {
             return true;
           }
           return false;
@@ -82,6 +94,19 @@ export function initializeTracing(options: TracingOptions) {
   sdk.start();
 
   process.on("SIGTERM", shutdown(sdk));
+}
+
+function routeIsExplicitlyIgnored(ignoredRoutes: HttpRoute[], req: IncomingMessage) {
+  return ignoredRoutes.some((route) => {
+    if (route.method !== req.method) {
+      return false;
+    }
+    if (typeof route.url === "string") {
+      return req.url === route.url;
+    } else {
+      return route.url.test(req.url ?? "");
+    }
+  });
 }
 
 function getRegularExpressionsMatchingAllContentsOfDirectory(directory?: string): RegExp[] {

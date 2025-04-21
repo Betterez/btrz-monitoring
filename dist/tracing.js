@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeTracing = initializeTracing;
+const node_assert_1 = __importDefault(require("node:assert"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
@@ -52,7 +53,8 @@ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled, serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests } = options;
+    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests = false } = options;
+    (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return;
     }
@@ -73,6 +75,7 @@ function initializeTracing(options) {
             [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
         }),
         spanProcessors: [spanProcessor],
+        sampler: samplePercentage === 100 ? new sdk_trace_base_1.AlwaysOnSampler() : new sdk_trace_base_1.TraceIdRatioBasedSampler(samplePercentage / 100),
         instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({
                 "@opentelemetry/instrumentation-fs": {
                     enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().

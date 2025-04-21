@@ -1,4 +1,5 @@
 interface TracingOptions {
+    enabled?: boolean;
     serviceName: string;
     traceDestinationUrl: string;
     ignoreStaticAssetDir?: string;

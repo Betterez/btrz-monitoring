@@ -48,13 +48,14 @@ const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentatio
 const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
 const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
+const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    if (node_process_1.default.env.NODE_ENV === "test") {
+    const { enabled, serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests } = options;
+    if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return;
     }
-    const { serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests } = options;
     const incomingHttpRequestUrlsToIgnore = [
         ...getRegularExpressionsMatchingAllContentsOfDirectory(ignoreStaticAssetDir),
         /^\/__webpack_hmr/ // Ignore requests made by webpack hot-reload tooling
@@ -63,11 +64,15 @@ function initializeTracing(options) {
     const traceExporter = new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
         url: traceDestinationUrl
     });
+    const spanProcessor = new sdk_trace_base_1.BatchSpanProcessor(traceExporter, {
+        maxExportBatchSize: 4096,
+        maxQueueSize: 8192
+    });
     const sdk = new sdk_node_1.NodeSDK({
         resource: (0, resources_1.resourceFromAttributes)({
             [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
         }),
-        traceExporter,
+        spanProcessors: [spanProcessor],
         instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({
                 "@opentelemetry/instrumentation-fs": {
                     enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().
@@ -75,7 +80,6 @@ function initializeTracing(options) {
                 },
                 "@opentelemetry/instrumentation-http": {
                     ignoreIncomingRequestHook(req) {
-                        debugger;
                         if (incomingHttpRequestUrlsToIgnore.some(regex => regex.test(req.url ?? ""))) {
                             return true;
                         }

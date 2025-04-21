@@ -4,7 +4,13 @@ interface TracingOptions {
     samplePercentage?: number;
     traceDestinationUrl: string;
     ignoreStaticAssetDir?: string;
-    ignoreHttpOptionsRequests?: boolean;
+    ignoredHttpMethods?: HttpMethod[];
+    ignoredRoutes?: HttpRoute[];
 }
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
+type HttpRoute = {
+    method: HttpMethod;
+    url: string | RegExp;
+};
 export declare function initializeTracing(options: TracingOptions): void;
 export {};

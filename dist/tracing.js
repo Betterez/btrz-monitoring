@@ -53,7 +53,7 @@ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests = false } = options;
+    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir, ignoredHttpMethods = [], ignoredRoutes = [] } = options;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return;
@@ -86,7 +86,10 @@ function initializeTracing(options) {
                         if (incomingHttpRequestUrlsToIgnore.some(regex => regex.test(req.url ?? ""))) {
                             return true;
                         }
-                        else if (ignoreHttpOptionsRequests && req.method === "OPTIONS") {
+                        else if (ignoredHttpMethods.includes(req.method)) {
+                            return true;
+                        }
+                        else if (routeIsExplicitlyIgnored(ignoredRoutes, req)) {
                             return true;
                         }
                         return false;
@@ -96,6 +99,19 @@ function initializeTracing(options) {
     });
     sdk.start();
     node_process_1.default.on("SIGTERM", shutdown(sdk));
+}
+function routeIsExplicitlyIgnored(ignoredRoutes, req) {
+    return ignoredRoutes.some((route) => {
+        if (route.method !== req.method) {
+            return false;
+        }
+        if (typeof route.url === "string") {
+            return req.url === route.url;
+        }
+        else {
+            return route.url.test(req.url ?? "");
+        }
+    });
 }
 function getRegularExpressionsMatchingAllContentsOfDirectory(directory) {
     if (!directory) {

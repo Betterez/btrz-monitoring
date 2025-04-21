@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import process from "node:process";
@@ -9,11 +10,12 @@ import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-
 import {OTLPTraceExporter} from "@opentelemetry/exporter-trace-otlp-grpc";
 import {resourceFromAttributes} from "@opentelemetry/resources";
 import {ATTR_SERVICE_NAME} from "@opentelemetry/semantic-conventions";
-import {BatchSpanProcessor} from "@opentelemetry/sdk-trace-base";
+import {BatchSpanProcessor, AlwaysOnSampler, TraceIdRatioBasedSampler} from "@opentelemetry/sdk-trace-base";
 
 interface TracingOptions {
   enabled?: boolean;
   serviceName: string;
+  samplePercentage?: number;
   traceDestinationUrl: string;
   ignoreStaticAssetDir?: string;
   ignoreHttpOptionsRequests?: boolean;
@@ -22,7 +24,16 @@ interface TracingOptions {
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 export function initializeTracing(options: TracingOptions) {
-  const {enabled, serviceName, traceDestinationUrl, ignoreStaticAssetDir, ignoreHttpOptionsRequests} = options;
+  const {
+    enabled = true,
+    serviceName,
+    samplePercentage = 100,
+    traceDestinationUrl,
+    ignoreStaticAssetDir,
+    ignoreHttpOptionsRequests = false
+  } = options;
+
+  assert(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
 
   if (enabled === false || process.env.NODE_ENV === "test") {
     return;
@@ -49,6 +60,7 @@ export function initializeTracing(options: TracingOptions) {
       [ATTR_SERVICE_NAME]: serviceName
     }),
     spanProcessors: [spanProcessor],
+    sampler: samplePercentage === 100 ? new AlwaysOnSampler() : new TraceIdRatioBasedSampler(samplePercentage / 100),
     instrumentations: [getNodeAutoInstrumentations({
       "@opentelemetry/instrumentation-fs": {
         enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().

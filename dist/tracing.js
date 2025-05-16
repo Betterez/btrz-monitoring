@@ -53,7 +53,7 @@ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir, ignoredHttpMethods = [], ignoredRoutes = [] } = options;
+    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir, ignoredHttpMethods = [], ignoredRoutes = [], enableFilesystemTracing = false } = options;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return;
@@ -62,7 +62,9 @@ function initializeTracing(options) {
         ...getRegularExpressionsMatchingAllContentsOfDirectory(ignoreStaticAssetDir),
         /^\/__webpack_hmr/ // Ignore requests made by webpack hot-reload tooling
     ];
-    setEnabledInstrumentations();
+    if (enableFilesystemTracing) {
+        forcefullyEnableFilesystemTracing();
+    }
     const traceExporter = new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
         url: traceDestinationUrl
     });
@@ -136,7 +138,7 @@ function getRegularExpressionsMatchingAllContentsOfDirectory(directory) {
 // Work around a bug in the open telemetry library where the "@opentelemetry/instrumentation-fs" instrumentation
 // cannot be enabled via the instrumentation config.  Instead, it must be enabled by setting an environment variable.
 // https://github.com/open-telemetry/opentelemetry-js-contrib/issues/2515
-function setEnabledInstrumentations() {
+function forcefullyEnableFilesystemTracing() {
     if (!node_process_1.default.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS) {
         node_process_1.default.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS = [
             "amqplib", "aws-lambda", "aws-sdk",

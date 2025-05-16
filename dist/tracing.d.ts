@@ -6,6 +6,7 @@ interface TracingOptions {
     ignoreStaticAssetDir?: string;
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];
+    enableFilesystemTracing?: boolean;
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
 type HttpRoute = {

@@ -3,7 +3,7 @@ interface TracingOptions {
     serviceName: string;
     samplePercentage?: number;
     traceDestinationUrl: string;
-    ignoreStaticAssetDir?: string;
+    ignoreStaticAssetDir?: string | string[];
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];
     enableFilesystemTracing?: boolean;

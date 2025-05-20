@@ -64,6 +64,7 @@ function initializeTracing(options) {
     }).flat();
     const incomingHttpRequestUrlPatternsToIgnore = [
         ...staticAssetUrlPatternsToIgnore,
+        /^\/favicon\.ico$/,
         /^\/\.well-known/, // Ignore requests made by a Chrome dev tools feature
         /^\/__webpack_hmr/ // Ignore requests made by webpack hot-reload tooling
     ];

@@ -18,7 +18,7 @@ interface TracingOptions {
   serviceName: string;
   samplePercentage?: number;
   traceDestinationUrl: string;
-  ignoreStaticAssetDir?: string;
+  ignoreStaticAssetDir?: string | string[];
   ignoredHttpMethods?: HttpMethod[];
   ignoredRoutes?: HttpRoute[];
   enableFilesystemTracing?: boolean;
@@ -39,7 +39,7 @@ export function initializeTracing(options: TracingOptions) {
     serviceName,
     samplePercentage = 100,
     traceDestinationUrl,
-    ignoreStaticAssetDir,
+    ignoreStaticAssetDir = [],
     ignoredHttpMethods = [],
     ignoredRoutes = [],
     enableFilesystemTracing = false
@@ -51,8 +51,14 @@ export function initializeTracing(options: TracingOptions) {
     return;
   }
 
-  const incomingHttpRequestUrlsToIgnore = [
-    ...getRegularExpressionsMatchingAllContentsOfDirectory(ignoreStaticAssetDir),
+  const staticAssetDirectoriesToIgnore = Array.isArray(ignoreStaticAssetDir) ? ignoreStaticAssetDir : [ignoreStaticAssetDir];
+  const staticAssetUrlPatternsToIgnore = staticAssetDirectoriesToIgnore.map((directory) => {
+    return getRegularExpressionsMatchingAllContentsOfDirectory(directory);
+  }).flat();
+
+  const incomingHttpRequestUrlPatternsToIgnore = [
+    ...staticAssetUrlPatternsToIgnore,
+    /^\/\.well-known/, // Ignore requests made by a Chrome dev tools feature
     /^\/__webpack_hmr/ // Ignore requests made by webpack hot-reload tooling
   ];
 
@@ -82,7 +88,7 @@ export function initializeTracing(options: TracingOptions) {
       },
       "@opentelemetry/instrumentation-http": {
         ignoreIncomingRequestHook(req) {
-          if (incomingHttpRequestUrlsToIgnore.some(regex => regex.test(req.url ?? ""))) {
+          if (incomingHttpRequestUrlPatternsToIgnore.some(regex => regex.test(req.url ?? ""))) {
             return true;
           } else if (ignoredHttpMethods.includes(req.method as HttpMethod)) {
             return true;
@@ -113,11 +119,7 @@ function routeIsExplicitlyIgnored(ignoredRoutes: HttpRoute[], req: IncomingMessa
   });
 }
 
-function getRegularExpressionsMatchingAllContentsOfDirectory(directory?: string): RegExp[] {
-  if (!directory) {
-    return [];
-  }
-
+function getRegularExpressionsMatchingAllContentsOfDirectory(directory: string): RegExp[] {
   const allContentsOfDirectory = fs.readdirSync(directory);
 
   const regularExpressions = allContentsOfDirectory.map((entry) => {

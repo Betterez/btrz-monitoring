@@ -15,5 +15,10 @@
     "noImplicitAny": true,
   },
   "include": ["src/**/*"],
-  "exclude": ["test/*"]
+  "exclude": ["test/*"],
+
+  // Mocha tests currently fail to compile unless this file is explicitly included
+  "files": [
+    "src/global.d.ts"
+  ]
 }

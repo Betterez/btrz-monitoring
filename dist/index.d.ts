@@ -1,1 +1,1 @@
-export { initializeTracing } from "./tracing";
+export { initializeTracing, trace } from "./tracing";

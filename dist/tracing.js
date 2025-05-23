@@ -37,6 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeTracing = initializeTracing;
+exports.trace = trace;
+exports.__enableTestMode = __enableTestMode;
 const node_assert_1 = __importDefault(require("node:assert"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
@@ -50,6 +52,8 @@ const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-g
 const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
+const api_1 = require("@opentelemetry/api");
+const incubating_1 = require("@opentelemetry/semantic-conventions/incubating");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
@@ -71,13 +75,15 @@ function initializeTracing(options) {
     if (enableFilesystemTracing) {
         forcefullyEnableFilesystemTracing();
     }
-    const traceExporter = new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
-        url: traceDestinationUrl
-    });
-    const spanProcessor = new sdk_trace_base_1.BatchSpanProcessor(traceExporter, {
-        maxExportBatchSize: 4096,
-        maxQueueSize: 8192
-    });
+    const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
+        new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
+            url: traceDestinationUrl
+        });
+    const spanProcessor = global.__btrz_monitoring__spanProcessorForTests ||
+        new sdk_trace_base_1.BatchSpanProcessor(traceExporter, {
+            maxExportBatchSize: 4096,
+            maxQueueSize: 8192
+        });
     const sdk = new sdk_node_1.NodeSDK({
         resource: (0, resources_1.resourceFromAttributes)({
             [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
@@ -171,6 +177,112 @@ function shutdown(sdk) {
             console.error(chalk_1.default.red(util.inspect(error)));
             node_process_1.default.exit(1);
         }
+    };
+}
+function trace(arg1, arg2, arg3) {
+    const tracer = api_1.trace.getTracer("btrz-monitoring");
+    let spanName;
+    let traceOptions;
+    let functionToTrace;
+    if (typeof arg1 === "function") {
+        functionToTrace = arg1;
+        spanName = functionToTrace.name || "anonymous function";
+        traceOptions = {};
+    }
+    else if (typeof arg2 === "function") {
+        spanName = arg1;
+        functionToTrace = arg2;
+        traceOptions = {};
+    }
+    else {
+        spanName = arg1;
+        traceOptions = arg2 || {};
+        functionToTrace = arg3;
+    }
+    let result;
+    let synchronousError;
+    const { inheritAttributesFromParentTrace, ..._spanOptions } = traceOptions;
+    const activeSpan = api_1.trace.getActiveSpan();
+    let attributesToCopy = {};
+    let linksToCopy = [];
+    let spanKind = api_1.SpanKind.INTERNAL;
+    if (inheritAttributesFromParentTrace && activeSpan) {
+        attributesToCopy = activeSpan.attributes;
+        linksToCopy = activeSpan.links;
+        spanKind = activeSpan.kind;
+    }
+    const spanOptions = {
+        ..._spanOptions,
+        attributes: {
+            [incubating_1.ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || undefined,
+            ...attributesToCopy,
+            ...(_spanOptions.attributes || {})
+        },
+        links: [...(_spanOptions.links || []), ...linksToCopy],
+        kind: _spanOptions.kind ?? spanKind,
+    };
+    tracer.startActiveSpan(spanName, spanOptions, (span) => {
+        try {
+            result = functionToTrace();
+        }
+        catch (error) {
+            synchronousError = error;
+            span.setStatus({
+                code: api_1.SpanStatusCode.ERROR,
+                message: error?.message
+            });
+        }
+        if (isPromiseLike(result)) {
+            result
+                .then((result) => {
+                span.setStatus({
+                    code: api_1.SpanStatusCode.OK
+                });
+                span.end();
+                return result;
+            }, (_error) => {
+                span.setStatus({
+                    code: api_1.SpanStatusCode.ERROR,
+                    message: _error?.message
+                });
+                span.end();
+                throw _error;
+            });
+        }
+        else {
+            if (!synchronousError) {
+                span.setStatus({
+                    code: api_1.SpanStatusCode.OK
+                });
+            }
+            span.end();
+        }
+    });
+    if (synchronousError) {
+        throw synchronousError;
+    }
+    return result;
+}
+function isPromiseLike(value) {
+    return typeof value?.then === "function";
+}
+// Called by internal tests so that they can inspect the spans that are created by the tracing instrumentation.
+function __enableTestMode() {
+    // Global variables are used here to avoid changing the span exporter / span processor when tests are running.
+    // The OpenTelemetry library seems to internally keep a reference to the first span exporter and span processor that
+    // is provided to it.  If the span exporter / span processor is changed, the OpenTelemetry code will not respect this
+    // change and will continue to use the previous span exporter / span processor.  Using a global variable ensures that
+    // the span exporter / span processor never changes, which can be difficult to avoid when tests are running in "watch"
+    // mode.
+    if (!global.__btrz_monitoring__spanExporterForTests) {
+        global.__btrz_monitoring__spanExporterForTests = new sdk_trace_base_1.InMemorySpanExporter();
+    }
+    if (!global.__btrz_monitoring__spanProcessorForTests) {
+        global.__btrz_monitoring__spanProcessorForTests = new sdk_trace_base_1.SimpleSpanProcessor(__btrz_monitoring__spanExporterForTests);
+    }
+    return {
+        spanExporter: global.__btrz_monitoring__spanExporterForTests,
+        spanProcessor: global.__btrz_monitoring__spanProcessorForTests
     };
 }
 //# sourceMappingURL=tracing.js.map

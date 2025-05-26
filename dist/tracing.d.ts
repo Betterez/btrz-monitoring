@@ -8,9 +8,11 @@ interface TracingInitOptions {
     ignoreStaticAssetDir?: string | string[];
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];
+    ignoredAwsSqsEvents?: AwsSqsEvent[];
     enableFilesystemTracing?: boolean;
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
+type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
 type HttpRoute = {
     method: HttpMethod;
     url: string | RegExp;

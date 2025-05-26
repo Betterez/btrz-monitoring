@@ -58,7 +58,7 @@ const incubating_1 = require("@opentelemetry/semantic-conventions/incubating");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], enableFilesystemTracing = false } = options;
+    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return;
@@ -108,6 +108,19 @@ function initializeTracing(options) {
                             return true;
                         }
                         return false;
+                    }
+                },
+                "@opentelemetry/instrumentation-aws-sdk": {
+                    suppressInternalInstrumentation: true,
+                    preRequestHook(span, request) {
+                        if (ignoredAwsSqsEvents.includes(request.request.commandName)) {
+                            span.spanContext().traceFlags = api_1.TraceFlags.NONE;
+                        }
+                    },
+                    sqsProcessHook(span, sqsProcessInfo) {
+                        if (ignoredAwsSqsEvents.includes("ProcessMessage")) {
+                            span.spanContext().traceFlags = api_1.TraceFlags.NONE;
+                        }
                     }
                 }
             })]

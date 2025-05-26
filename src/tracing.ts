@@ -198,37 +198,23 @@ function shutdown(sdk: NodeSDK) {
   };
 }
 
-type TraceableFunction<R> = () => R;
+type TraceableFunction<T, R> = (...args: T[]) => R;
+type TraceableFunctionWithoutArgs<R> = () => R;
 type TraceOptions = SpanOptions & { inheritAttributesFromParentTrace?: boolean };
 
-export function trace<R>(fn: TraceableFunction<R>): R;
-export function trace<R>(spanName: string, fn: TraceableFunction<R>): R;
-export function trace<R>(traceOptions: TraceOptions, fn: TraceableFunction<R>): R;
-export function trace<R>(spanName: string, traceOptions: TraceOptions, fn: TraceableFunction<R>): R;
-export function trace<R>(arg1: string | TraceOptions | TraceableFunction<R>, arg2?: TraceOptions | TraceableFunction<R>, arg3?: TraceableFunction<R>): R {
+export function trace<R>(fn: TraceableFunctionWithoutArgs<R>): R;
+export function trace<R>(spanName: string, fn: TraceableFunctionWithoutArgs<R>): R;
+export function trace<R>(options: TraceOptions, fn: TraceableFunctionWithoutArgs<R>): R;
+export function trace<R>(spanName: string, options: TraceOptions, fn: TraceableFunctionWithoutArgs<R>): R;
+export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutArgs<R>, arg2?: TraceOptions | TraceableFunctionWithoutArgs<R>, arg3?: TraceableFunctionWithoutArgs<R>): R {
   const tracer = otlpTrace.getTracer("btrz-monitoring");
 
-  let spanName: string;
-  let traceOptions: TraceOptions;
-  let functionToTrace: TraceableFunction<R>;
-
-  if (typeof arg1 === "function") {
-    functionToTrace = arg1;
-    spanName = functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
-    traceOptions = {};
-  } else if (typeof arg1 === "string" && typeof arg2 === "function") {
-    spanName = arg1;
-    functionToTrace = arg2;
-    traceOptions = {};
-  } else if (typeof arg1 === "object" && typeof arg2 === "function") {
-    traceOptions = arg1;
-    functionToTrace = arg2;
-    spanName = functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
-  } else {
-    spanName = arg1 as string;
-    traceOptions = arg2 as TraceOptions || {};
-    functionToTrace = arg3!;
-  }
+  const {
+    spanNameFromArgs,
+    traceOptions,
+    functionToTrace
+  } = extractArguments(arg1, arg2, arg3);
+  const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
 
   let result: R;
   let synchronousError: any;
@@ -298,6 +284,60 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunction<R>, arg
   }
 
   return result!;
+}
+
+export function withTracing<T, R>(fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T, R>(spanName: string, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T, R>(options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T, R>(spanName: string, options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T, R>(arg1: string | TraceOptions | TraceableFunction<T, R>, arg2?: TraceOptions | TraceableFunction<T, R>, arg3? : TraceableFunction<T, R>): TraceableFunction<T, R> {
+  const {
+    spanNameFromArgs,
+    traceOptions,
+    functionToTrace
+  } = extractArguments(arg1, arg2, arg3);
+  const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
+
+  const wrapperFunction = (...args: T[]) => {
+    const traceExecutor = () => functionToTrace(...args);
+    Object.defineProperty(traceExecutor, "name", {value: functionToTrace.name});
+
+    return trace(spanName, traceOptions, traceExecutor);
+  };
+
+  Object.defineProperty(wrapperFunction, "length", {value: functionToTrace.length});
+  Object.defineProperty(wrapperFunction, "name", {value: functionToTrace.name});
+  return wrapperFunction;
+}
+
+function extractArguments<T extends Function>(arg1: string | TraceOptions | T, arg2?: TraceOptions | T, arg3? : T) {
+  let spanNameFromArgs: string | undefined;
+  let traceOptions: TraceOptions;
+  let functionToTrace: T;
+
+  if (typeof arg1 === "function") {
+    functionToTrace = arg1;
+    spanNameFromArgs = undefined;
+    traceOptions = {};
+  } else if (typeof arg1 === "string" && typeof arg2 === "function") {
+    spanNameFromArgs = arg1;
+    functionToTrace = arg2;
+    traceOptions = {};
+  } else if (typeof arg1 === "object" && typeof arg2 === "function") {
+    traceOptions = arg1;
+    functionToTrace = arg2;
+    spanNameFromArgs = undefined;
+  } else {
+    spanNameFromArgs = arg1 as string;
+    traceOptions = arg2 as TraceOptions || {};
+    functionToTrace = arg3!;
+  }
+
+  return {
+    spanNameFromArgs,
+    traceOptions,
+    functionToTrace
+  };
 }
 
 function isPromiseLike(value: any): value is PromiseLike<any> {

@@ -1,1 +1,1 @@
-export {initializeTracing, trace} from "./tracing";
+export {initializeTracing, trace, withTracing} from "./tracing";

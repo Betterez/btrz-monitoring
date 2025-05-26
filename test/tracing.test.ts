@@ -1,6 +1,6 @@
 import _ from "lodash";
 import {expect} from "chai";
-import {__enableTestMode, initializeTracing, trace} from "../src/tracing";
+import {__enableTestMode, initializeTracing, trace, withTracing} from "../src/tracing";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
 import {ATTR_ARTIFACT_VERSION, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions/incubating";
 import {Link, SpanKind, SpanStatusCode, TraceFlags} from "@opentelemetry/api";
@@ -473,6 +473,118 @@ describe("Tracing instrumentation", () => {
         const spans = await getSpans();
         expect(spans).to.have.length(1);
         expect(spans[0].kind).to.eql(SpanKind.INTERNAL);
+      });
+    });
+  });
+
+  describe("withTracing()", () => {
+    it("should accept a function as a parameter, and return a new function which traces the execution of the original function", async () => {
+      let originalFnWasCalled = false;
+
+      function originalFn() {
+        originalFnWasCalled = true;
+      }
+
+      const tracedFn = withTracing(originalFn);
+
+      expect(originalFnWasCalled).to.be.false;
+      tracedFn();
+      expect(originalFnWasCalled).to.be.true;
+
+      const spans = await getSpans();
+      expect(spans).to.have.length(1);
+      expect(spans[0].ended).to.be.true;
+    });
+
+    it("should return a function which has the same argument length as the original function", () => {
+      function originalFn(arg1: string, arg2: string, arg3: string) {
+        return arg1 + arg2 + arg3;
+      }
+
+      expect(originalFn.length).to.equal(3);
+      const tracedFn = withTracing(originalFn);
+      expect(tracedFn.length).to.equal(originalFn.length);
+    });
+
+    it("should return a function which has the same name as the original function", () => {
+      function originalFn() {
+      }
+
+      expect(originalFn.name).to.equal("originalFn");
+      const tracedFn = withTracing(originalFn);
+      expect(tracedFn.name).to.equal("originalFn");
+    });
+
+    it("should generate a span which is named after the function that is being traced", async () => {
+      function originalFn() {
+      }
+
+      const tracedFn = withTracing(originalFn);
+      tracedFn();
+
+      const spans = await getSpans();
+      expect(spans[0].name).to.equal("originalFn");
+    });
+
+    it("should allow the user to provide a custom name for the span", async () => {
+      function originalFn() {
+      }
+
+      const tracedFn = withTracing("my-span-name", originalFn);
+      tracedFn();
+
+      const spans = await getSpans();
+      expect(spans[0].name).to.equal("my-span-name");
+    });
+
+    it("should allow the user to provide options which affect the properties of the span", async () => {
+      function originalFn() {
+      }
+
+      const tracedFn = withTracing({kind: SpanKind.PRODUCER}, originalFn);
+      tracedFn();
+
+      const spans = await getSpans();
+      expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+    });
+
+    it("should allow the user to provide both a span name as well as options which affect the properties of the span", async () => {
+      function originalFn() {
+      }
+
+      const tracedFn = withTracing("my-span-name", {kind: SpanKind.PRODUCER}, originalFn);
+      tracedFn();
+
+      const spans = await getSpans();
+      expect(spans[0].name).to.equal("my-span-name");
+      expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+    });
+
+    context("when the function being traced is anonymous", () => {
+      it("should generate a span with the name of the calling function", async () => {
+        let tracedFn;
+
+        function callingFunction() {
+          tracedFn = withTracing(() => "anonymous arrow function return value");
+        }
+
+        callingFunction();
+        tracedFn!();
+
+        const spans = await getSpans();
+        expect(spans[0].name).to.equal("callingFunction");
+      });
+
+      it("should give the span the name 'unnamed trace' when the calling function is an anonymous function expression", async () => {
+        let tracedFn;
+
+        (function () {
+          tracedFn = withTracing(() => "anonymous arrow function return value");
+        })();
+
+        tracedFn!();
+        const spans = await getSpans();
+        expect(spans[0].name).to.be.equal("unnamed trace");
       });
     });
   });

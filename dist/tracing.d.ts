@@ -22,6 +22,7 @@ type TraceOptions = SpanOptions & {
 };
 export declare function trace<R>(fn: TraceableFunction<R>): R;
 export declare function trace<R>(spanName: string, fn: TraceableFunction<R>): R;
+export declare function trace<R>(traceOptions: TraceOptions, fn: TraceableFunction<R>): R;
 export declare function trace<R>(spanName: string, traceOptions: TraceOptions, fn: TraceableFunction<R>): R;
 export declare function __enableTestMode(): {
     spanExporter: InMemorySpanExporter;

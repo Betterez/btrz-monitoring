@@ -186,13 +186,18 @@ function trace(arg1, arg2, arg3) {
     let functionToTrace;
     if (typeof arg1 === "function") {
         functionToTrace = arg1;
-        spanName = functionToTrace.name || "anonymous function";
+        spanName = functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
         traceOptions = {};
     }
-    else if (typeof arg2 === "function") {
+    else if (typeof arg1 === "string" && typeof arg2 === "function") {
         spanName = arg1;
         functionToTrace = arg2;
         traceOptions = {};
+    }
+    else if (typeof arg1 === "object" && typeof arg2 === "function") {
+        traceOptions = arg1;
+        functionToTrace = arg2;
+        spanName = functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
     }
     else {
         spanName = arg1;
@@ -214,7 +219,7 @@ function trace(arg1, arg2, arg3) {
     const spanOptions = {
         ..._spanOptions,
         attributes: {
-            [incubating_1.ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || undefined,
+            [incubating_1.ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || getNameOfCallingFunction() || undefined,
             ...attributesToCopy,
             ...(_spanOptions.attributes || {})
         },
@@ -266,6 +271,16 @@ function trace(arg1, arg2, arg3) {
 function isPromiseLike(value) {
     return typeof value?.then === "function";
 }
+// Adapted from https://devimalplanet.com/javascript-how-to-get-the-caller-parent-functions-name
+function getNameOfCallingFunction() {
+    const e = new Error();
+    // matches this function, the caller and the parent
+    const allMatches = e.stack?.match(/(\w+)@|at(.*) [(\/\\]/g) ?? [];
+    // match parent function name
+    const parentMatches = allMatches[2]?.match(/(\w+)@|at(.*) [(\/\\]/) ?? [];
+    // return only name
+    return (parentMatches[1] || parentMatches[2] || "").trim();
+}
 // Called by internal tests so that they can inspect the spans that are created by the tracing instrumentation.
 function __enableTestMode() {
     // Global variables are used here to avoid changing the span exporter / span processor when tests are running.
@@ -278,7 +293,7 @@ function __enableTestMode() {
         global.__btrz_monitoring__spanExporterForTests = new sdk_trace_base_1.InMemorySpanExporter();
     }
     if (!global.__btrz_monitoring__spanProcessorForTests) {
-        global.__btrz_monitoring__spanProcessorForTests = new sdk_trace_base_1.SimpleSpanProcessor(__btrz_monitoring__spanExporterForTests);
+        global.__btrz_monitoring__spanProcessorForTests = new sdk_trace_base_1.SimpleSpanProcessor(global.__btrz_monitoring__spanExporterForTests);
     }
     return {
         spanExporter: global.__btrz_monitoring__spanExporterForTests,

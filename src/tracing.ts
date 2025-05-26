@@ -203,8 +203,9 @@ type TraceOptions = SpanOptions & { inheritAttributesFromParentTrace?: boolean }
 
 export function trace<R>(fn: TraceableFunction<R>): R;
 export function trace<R>(spanName: string, fn: TraceableFunction<R>): R;
+export function trace<R>(traceOptions: TraceOptions, fn: TraceableFunction<R>): R;
 export function trace<R>(spanName: string, traceOptions: TraceOptions, fn: TraceableFunction<R>): R;
-export function trace<R>(arg1: string | TraceableFunction<R>, arg2?: TraceOptions | TraceableFunction<R>, arg3?: TraceableFunction<R>): R {
+export function trace<R>(arg1: string | TraceOptions | TraceableFunction<R>, arg2?: TraceOptions | TraceableFunction<R>, arg3?: TraceableFunction<R>): R {
   const tracer = otlpTrace.getTracer("btrz-monitoring");
 
   let spanName: string;
@@ -213,15 +214,19 @@ export function trace<R>(arg1: string | TraceableFunction<R>, arg2?: TraceOption
 
   if (typeof arg1 === "function") {
     functionToTrace = arg1;
-    spanName = functionToTrace.name || "anonymous function";
+    spanName = functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
     traceOptions = {};
-  } else if (typeof arg2 === "function") {
+  } else if (typeof arg1 === "string" && typeof arg2 === "function") {
     spanName = arg1;
     functionToTrace = arg2;
     traceOptions = {};
+  } else if (typeof arg1 === "object" && typeof arg2 === "function") {
+    traceOptions = arg1;
+    functionToTrace = arg2;
+    spanName = functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
   } else {
-    spanName = arg1;
-    traceOptions = arg2 || {};
+    spanName = arg1 as string;
+    traceOptions = arg2 as TraceOptions || {};
     functionToTrace = arg3!;
   }
 
@@ -243,7 +248,7 @@ export function trace<R>(arg1: string | TraceableFunction<R>, arg2?: TraceOption
   const spanOptions: SpanOptions = {
     ..._spanOptions,
     attributes: {
-      [ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || undefined,
+      [ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || getNameOfCallingFunction() || undefined,
       ...attributesToCopy,
       ...(_spanOptions.attributes || {})
     },
@@ -299,6 +304,17 @@ function isPromiseLike(value: any): value is PromiseLike<any> {
   return typeof value?.then === "function";
 }
 
+// Adapted from https://devimalplanet.com/javascript-how-to-get-the-caller-parent-functions-name
+function getNameOfCallingFunction() {
+    const e = new Error();
+    // matches this function, the caller and the parent
+    const allMatches = e.stack?.match(/(\w+)@|at(.*) [(\/\\]/g) ?? [];
+    // match parent function name
+    const parentMatches = allMatches[2]?.match(/(\w+)@|at(.*) [(\/\\]/) ?? [];
+    // return only name
+    return (parentMatches[1] || parentMatches[2] || "").trim();
+}
+
 // Called by internal tests so that they can inspect the spans that are created by the tracing instrumentation.
 export function __enableTestMode() {
   // Global variables are used here to avoid changing the span exporter / span processor when tests are running.
@@ -311,7 +327,7 @@ export function __enableTestMode() {
     global.__btrz_monitoring__spanExporterForTests = new InMemorySpanExporter();
   }
   if (!global.__btrz_monitoring__spanProcessorForTests) {
-    global.__btrz_monitoring__spanProcessorForTests = new SimpleSpanProcessor(__btrz_monitoring__spanExporterForTests);
+    global.__btrz_monitoring__spanProcessorForTests = new SimpleSpanProcessor(global.__btrz_monitoring__spanExporterForTests);
   }
 
   return {

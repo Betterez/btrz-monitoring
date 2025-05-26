@@ -1,3 +1,4 @@
+import _ from "lodash";
 import {expect} from "chai";
 import {__enableTestMode, initializeTracing, trace} from "../src/tracing";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
@@ -45,7 +46,7 @@ describe("Tracing instrumentation", () => {
         expect(spans[0].ended).to.be.true;
       });
 
-      it("should generate a span which is named after the function", async () => {
+      it("should generate a span which is named after the function that is being traced", async () => {
         trace(syncFn);
         const spans = await getSpans();
         expect(spans[0].name).to.equal("syncFn");
@@ -58,8 +59,15 @@ describe("Tracing instrumentation", () => {
       });
 
       it("should allow the user to provide options which affect the properties of the span", async () => {
+        trace({kind: SpanKind.PRODUCER}, syncFn);
+        const spans = await getSpans();
+        expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+      });
+
+      it("should allow the user to provide both a span name as well as options which affect the properties of the span", async () => {
         trace("my-span-name", {kind: SpanKind.PRODUCER}, syncFn);
         const spans = await getSpans();
+        expect(spans[0].name).to.equal("my-span-name");
         expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
       });
 
@@ -155,17 +163,81 @@ describe("Tracing instrumentation", () => {
         });
       });
 
-      context("when the function is anonymous", () => {
-        it("should generate a span with the name 'anonymous function'", async () => {
-          trace(() => "anonymous arrow function return value");
+      context("when the function being traced is anonymous", () => {
+        it("should generate a span with the name of the calling function", async () => {
+          function callingFunction() {
+            trace(() => "anonymous arrow function return value");
+          }
+
+          callingFunction();
           const spans = await getSpans();
-          expect(spans[0].name).to.equal("anonymous function");
+          expect(spans[0].name).to.equal("callingFunction");
         });
 
-        it("should not add an attribute to the span with the name of the function", async () => {
-          trace(() => "anonymous arrow function return value");
+        it("should add an attribute to the span with the name of the calling function", async () => {
+          function callingFunction() {
+            trace(() => "anonymous arrow function return value");
+          }
+
+          callingFunction();
+          const spans = await getSpans();
+          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.equal("callingFunction");
+        });
+
+        it("should generate a span with the name of the calling function when the calling function is an arrow function that has been assigned to a variable", async () => {
+          const callingFunction = () => {
+            trace(() => "anonymous arrow function return value");
+          }
+
+          callingFunction();
+          const spans = await getSpans();
+          expect(spans[0].name).to.equal("callingFunction");
+        });
+
+        it("should add an attribute to the span with the name of the calling function when the calling function is an arrow function that has been assigned to a variable", async () => {
+          const callingFunction = () => {
+            trace(() => "anonymous arrow function return value");
+          }
+
+          callingFunction();
+          const spans = await getSpans();
+          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.equal("callingFunction");
+        });
+
+        it("should not add an attribute to the span with the name of the function when called within an anonymous function expression", async () => {
+          (function () {
+            trace(() => "anonymous arrow function return value");
+          })();
+
           const spans = await getSpans();
           expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.be.undefined;
+        });
+
+        it("should give the span the name 'unnamed trace' when called within an anonymous function expression", async () => {
+          (function () {
+            trace(() => "anonymous arrow function return value");
+          })();
+
+          const spans = await getSpans();
+          expect(spans[0].name).to.be.equal("unnamed trace");
+        });
+
+        it("should not add an attribute to the span with the name of the function when called within an anonymous arrow function expression", async () => {
+          (() => {
+            trace(() => "anonymous arrow function return value");
+          })();
+
+          const spans = await getSpans();
+          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.be.undefined;
+        });
+
+        it("should give the span the name 'unnamed trace' when called within an anonymous arrow function expression", async () => {
+          (() => {
+            trace(() => "anonymous arrow function return value");
+          })();
+
+          const spans = await getSpans();
+          expect(spans[0].name).to.be.equal("unnamed trace");
         });
       });
     });
@@ -390,7 +462,7 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         expect(spans).to.have.length(1);
-        expect(spans[0].attributes).to.eql({});
+        expect(_.omit(spans[0].attributes, ATTR_CODE_FUNCTION_NAME)).to.eql({});
         expect(spans[0].links).to.eql([]);
         expect(spans[0].kind).to.eql(SpanKind.INTERNAL);
       });

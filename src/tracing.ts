@@ -31,7 +31,10 @@ import {
   trace as otlpTrace,
   TraceFlags
 } from "@opentelemetry/api";
-import {AwsSdkRequestHookInformation} from "@opentelemetry/instrumentation-aws-sdk/build/src/types";
+import {
+  AwsSdkRequestHookInformation,
+  AwsSdkSqsProcessHookInformation
+} from "@opentelemetry/instrumentation-aws-sdk";
 import {ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions/incubating";
 
 interface TracingInitOptions {
@@ -42,10 +45,12 @@ interface TracingInitOptions {
   ignoreStaticAssetDir?: string | string[];
   ignoredHttpMethods?: HttpMethod[];
   ignoredRoutes?: HttpRoute[];
+  ignoredAwsSqsEvents?: AwsSqsEvent[];
   enableFilesystemTracing?: boolean;
 }
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
+type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
 
 type HttpRoute = {
   method: HttpMethod;
@@ -63,6 +68,7 @@ export function initializeTracing(options: TracingInitOptions) {
     ignoreStaticAssetDir = [],
     ignoredHttpMethods = [],
     ignoredRoutes = [],
+    ignoredAwsSqsEvents = [],
     enableFilesystemTracing = false
   } = options;
 
@@ -120,6 +126,19 @@ export function initializeTracing(options: TracingInitOptions) {
             return true;
           }
           return false;
+        }
+      },
+      "@opentelemetry/instrumentation-aws-sdk": {
+        suppressInternalInstrumentation: true,
+        preRequestHook(span: Span, request: AwsSdkRequestHookInformation) {
+          if ((ignoredAwsSqsEvents as string[]).includes(request.request.commandName)) {
+            span.spanContext().traceFlags = TraceFlags.NONE;
+          }
+        },
+        sqsProcessHook(span: Span, sqsProcessInfo: AwsSdkSqsProcessHookInformation) {
+          if (ignoredAwsSqsEvents.includes("ProcessMessage")) {
+            span.spanContext().traceFlags = TraceFlags.NONE;
+          }
         }
       }
     })]

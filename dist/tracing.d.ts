@@ -18,7 +18,7 @@ type HttpRoute = {
     url: string | RegExp;
 };
 export declare function initializeTracing(options: TracingInitOptions): void;
-type TraceableFunction<T, R> = (...args: T[]) => R;
+type TraceableFunction<T extends unknown[], R> = (...args: T) => R;
 type TraceableFunctionWithoutArgs<R> = () => R;
 type TraceOptions = SpanOptions & {
     inheritAttributesFromParentTrace?: boolean;
@@ -27,10 +27,10 @@ export declare function trace<R>(fn: TraceableFunctionWithoutArgs<R>): R;
 export declare function trace<R>(spanName: string, fn: TraceableFunctionWithoutArgs<R>): R;
 export declare function trace<R>(options: TraceOptions, fn: TraceableFunctionWithoutArgs<R>): R;
 export declare function trace<R>(spanName: string, options: TraceOptions, fn: TraceableFunctionWithoutArgs<R>): R;
-export declare function withTracing<T, R>(fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export declare function withTracing<T, R>(spanName: string, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export declare function withTracing<T, R>(options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export declare function withTracing<T, R>(spanName: string, options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export declare function withTracing<T extends unknown[], R>(fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export declare function withTracing<T extends unknown[], R>(spanName: string, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export declare function withTracing<T extends unknown[], R>(options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export declare function withTracing<T extends unknown[], R>(spanName: string, options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
 export declare function __enableTestMode(): {
     spanExporter: InMemorySpanExporter;
     spanProcessor: SimpleSpanProcessor;

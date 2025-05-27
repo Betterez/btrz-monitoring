@@ -497,7 +497,7 @@ describe("Tracing instrumentation", () => {
     });
 
     it("should return a function which has the same argument length as the original function", () => {
-      function originalFn(arg1: string, arg2: string, arg3: string) {
+      function originalFn(arg1: string, arg2: string, arg3: number) {
         return arg1 + arg2 + arg3;
       }
 

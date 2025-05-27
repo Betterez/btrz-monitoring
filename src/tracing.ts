@@ -217,7 +217,7 @@ function shutdown(sdk: NodeSDK) {
   };
 }
 
-type TraceableFunction<T, R> = (...args: T[]) => R;
+type TraceableFunction<T extends unknown[], R> = (...args: T) => R;
 type TraceableFunctionWithoutArgs<R> = () => R;
 type TraceOptions = SpanOptions & { inheritAttributesFromParentTrace?: boolean };
 
@@ -305,11 +305,11 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
   return result!;
 }
 
-export function withTracing<T, R>(fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export function withTracing<T, R>(spanName: string, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export function withTracing<T, R>(options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export function withTracing<T, R>(spanName: string, options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
-export function withTracing<T, R>(arg1: string | TraceOptions | TraceableFunction<T, R>, arg2?: TraceOptions | TraceableFunction<T, R>, arg3? : TraceableFunction<T, R>): TraceableFunction<T, R> {
+export function withTracing<T extends unknown[], R>(fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T extends unknown[], R>(spanName: string, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T extends unknown[], R>(options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T extends unknown[], R>(spanName: string, options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export function withTracing<T extends unknown[], R>(arg1: string | TraceOptions | TraceableFunction<T, R>, arg2?: TraceOptions | TraceableFunction<T, R>, arg3? : TraceableFunction<T, R>): TraceableFunction<T, R> {
   const {
     spanNameFromArgs,
     traceOptions,
@@ -317,7 +317,7 @@ export function withTracing<T, R>(arg1: string | TraceOptions | TraceableFunctio
   } = extractArguments(arg1, arg2, arg3);
   const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
 
-  const wrapperFunction = (...args: T[]) => {
+  const wrapperFunction = (...args: T) => {
     const traceExecutor = () => functionToTrace(...args);
     Object.defineProperty(traceExecutor, "name", {value: functionToTrace.name});
 
@@ -329,10 +329,14 @@ export function withTracing<T, R>(arg1: string | TraceOptions | TraceableFunctio
   return wrapperFunction;
 }
 
-function extractArguments<T extends Function>(arg1: string | TraceOptions | T, arg2?: TraceOptions | T, arg3? : T) {
+function extractArguments<T extends unknown[], R>(
+  arg1: string | TraceOptions | TraceableFunction<T, R>,
+  arg2?: TraceOptions | TraceableFunction<T, R>,
+  arg3? : TraceableFunction<T, R>
+) {
   let spanNameFromArgs: string | undefined;
   let traceOptions: TraceOptions;
-  let functionToTrace: T;
+  let functionToTrace: TraceableFunction<T, R>;
 
   if (typeof arg1 === "function") {
     functionToTrace = arg1;

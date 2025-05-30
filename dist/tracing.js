@@ -61,7 +61,9 @@ function initializeTracing(options) {
     const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
-        return;
+        return {
+            shutdownTracing: async () => { }
+        };
     }
     const staticAssetDirectoriesToIgnore = Array.isArray(ignoreStaticAssetDir) ? ignoreStaticAssetDir : [ignoreStaticAssetDir];
     const staticAssetUrlPatternsToIgnore = staticAssetDirectoriesToIgnore.map((directory) => {

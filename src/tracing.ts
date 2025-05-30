@@ -75,7 +75,9 @@ export function initializeTracing(options: TracingInitOptions) {
   assert(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
 
   if (enabled === false || process.env.NODE_ENV === "test") {
-    return;
+    return {
+      shutdownTracing: async () => {}
+    };
   }
 
   const staticAssetDirectoriesToIgnore = Array.isArray(ignoreStaticAssetDir) ? ignoreStaticAssetDir : [ignoreStaticAssetDir];

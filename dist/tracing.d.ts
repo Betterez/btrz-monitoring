@@ -17,7 +17,9 @@ type HttpRoute = {
     method: HttpMethod;
     url: string | RegExp;
 };
-export declare function initializeTracing(options: TracingInitOptions): void;
+export declare function initializeTracing(options: TracingInitOptions): {
+    shutdownTracing: () => Promise<void>;
+} | undefined;
 type TraceableFunction<T extends unknown[], R> = (...args: T) => R;
 type TraceableFunctionWithoutArgs<R> = () => R;
 type TraceOptions = SpanOptions & {

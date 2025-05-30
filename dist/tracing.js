@@ -126,7 +126,18 @@ function initializeTracing(options) {
             })]
     });
     sdk.start();
-    node_process_1.default.on("SIGTERM", shutdown(sdk));
+    node_process_1.default.on("SIGTERM", async () => {
+        try {
+            await shutdownTracing(sdk)();
+            node_process_1.default.exit(0);
+        }
+        catch (error) {
+            node_process_1.default.exit(1);
+        }
+    });
+    return {
+        shutdownTracing: shutdownTracing(sdk)
+    };
 }
 function routeIsExplicitlyIgnored(ignoredRoutes, req) {
     return ignoredRoutes.some((route) => {
@@ -180,16 +191,17 @@ function forcefullyEnableFilesystemTracing() {
         ].join(",");
     }
 }
-function shutdown(sdk) {
+function shutdownTracing(sdk) {
     return async () => {
         try {
+            console.log(chalk_1.default.yellow("[btrz-monitoring] Stopping tracing..."));
             await sdk.shutdown();
-            node_process_1.default.exit(0);
+            console.log(chalk_1.default.yellow("[btrz-monitoring] Tracing stopped"));
         }
         catch (error) {
             console.error(chalk_1.default.red("[btrz-monitoring] Error while stopping tracing"));
             console.error(chalk_1.default.red(util.inspect(error)));
-            node_process_1.default.exit(1);
+            throw error;
         }
     };
 }

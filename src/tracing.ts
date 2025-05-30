@@ -146,7 +146,18 @@ export function initializeTracing(options: TracingInitOptions) {
 
   sdk.start();
 
-  process.on("SIGTERM", shutdown(sdk));
+  process.on("SIGTERM", async () => {
+    try {
+      await shutdownTracing(sdk)();
+      process.exit(0);
+    } catch (error) {
+      process.exit(1);
+    }
+  });
+
+  return {
+    shutdownTracing: shutdownTracing(sdk)
+  };
 }
 
 function routeIsExplicitlyIgnored(ignoredRoutes: HttpRoute[], req: IncomingMessage) {
@@ -204,17 +215,18 @@ function forcefullyEnableFilesystemTracing() {
   }
 }
 
-function shutdown(sdk: NodeSDK) {
+function shutdownTracing(sdk: NodeSDK) {
   return async () => {
     try {
+      console.log(chalk.yellow("[btrz-monitoring] Stopping tracing..."));
       await sdk.shutdown();
-      process.exit(0);
+      console.log(chalk.yellow("[btrz-monitoring] Tracing stopped"));
     } catch (error) {
       console.error(chalk.red("[btrz-monitoring] Error while stopping tracing"));
       console.error(chalk.red(util.inspect(error)));
-      process.exit(1);
+      throw error;
     }
-  };
+  }
 }
 
 type TraceableFunction<T extends unknown[], R> = (...args: T) => R;

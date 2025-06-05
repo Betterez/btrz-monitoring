@@ -599,4 +599,4 @@ export declare const monitoringAttributes: {
     readonly METRIC_SIGNALR_SERVER_CONNECTION_DURATION: "signalr.server.connection.duration";
     readonly ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id";
 };
-export { initializeTracing, trace, withTracing } from "./tracing";
+export { initializeTracing, warmUpDatabaseConnectionForTracing, trace, withTracing } from "./tracing";

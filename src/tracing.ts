@@ -37,6 +37,8 @@ import {
 } from "@opentelemetry/instrumentation-aws-sdk";
 import {ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions/incubating";
 
+import {BtrzLogger, SimpleDao} from "./types/external.types";
+
 interface TracingInitOptions {
   enabled?: boolean;
   serviceName: string;
@@ -390,6 +392,23 @@ function getNameOfCallingFunction() {
     const parentMatches = allMatches[2]?.match(/(\w+)@|at(.*) [(\/\\]/) ?? [];
     // return only name
     return (parentMatches[1] || parentMatches[2] || "").trim();
+}
+
+/**
+ * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a
+ * polling process between the mongodb driver and the Mongo server. If the connection is not warmed up on server start, the first API which
+ * uses the database will initiate the connection.  The trace data captured for that API call will also include the polling traffic between
+ * the mongodb driver and the Mongo server.  This polling will continue until the server is shut down, and as a result, the trace will last
+ * as long as this server is running, and will contain details about the polling traffic between the mongo client and server.  We do not
+ * want to capture this polling traffic, and warming-up the database connection outside an API handler will prevent this.
+**/
+export async function warmUpDatabaseConnectionForTracing(simpleDao: SimpleDao, logger: BtrzLogger) {
+  try {
+    await simpleDao.connect();
+  } catch (error) {
+    // Do not re-throw the error in case this would prevent the server from starting.
+    logger.error("Error warming up connection to database", error);
+  }
 }
 
 // Called by internal tests so that they can inspect the spans that are created by the tracing instrumentation.

@@ -5,4 +5,4 @@ export const monitoringAttributes = {
   ...semanticConventions
 } as const;
 
-export {initializeTracing, trace, withTracing} from "./tracing";
+export {initializeTracing, warmUpDatabaseConnectionForTracing, trace, withTracing} from "./tracing";

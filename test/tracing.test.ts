@@ -506,6 +506,26 @@ describe("Tracing instrumentation", () => {
       expect(tracedFn.length).to.equal(originalFn.length);
     });
 
+    it("should allow the traced function to maintain the same 'this' binding as the original function via an explicit call to .bind(...)", () => {
+      class SomeClass {
+        someProperty: string;
+
+        constructor() {
+          this.someProperty = "some value";
+        }
+
+        originalFn() {
+          return this.someProperty;
+        }
+      }
+
+      const someInstance = new SomeClass();
+
+      expect(someInstance.originalFn()).to.equal(someInstance.someProperty);
+      const tracedFn = withTracing(someInstance.originalFn.bind(someInstance));
+      expect(tracedFn()).to.equal(someInstance.someProperty);
+    });
+
     it("should return a function which has the same name as the original function", () => {
       function originalFn() {
       }

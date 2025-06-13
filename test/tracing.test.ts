@@ -2,7 +2,8 @@ import _ from "lodash";
 import {expect} from "chai";
 import {__enableTestMode, initializeTracing, trace, withTracing} from "../src/tracing";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
-import {ATTR_ARTIFACT_VERSION, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions/incubating";
+import {ATTR_EXCEPTION_MESSAGE, ATTR_EXCEPTION_STACKTRACE, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions";
+import {ATTR_ARTIFACT_VERSION} from "@opentelemetry/semantic-conventions/incubating";
 import {Link, SpanKind, SpanStatusCode, TraceFlags} from "@opentelemetry/api";
 
 describe("Tracing instrumentation", () => {
@@ -124,6 +125,28 @@ describe("Tracing instrumentation", () => {
               code: SpanStatusCode.ERROR,
               message: "Error from syncFnWhichThrows"
             }
+          });
+        });
+
+        it("should add an attribute to the span containing the message from the original error", async () => {
+          try {
+            trace(syncFnWhichThrows);
+          } catch { }
+
+          const spans = await getSpans();
+          expect(spans[0].attributes).to.deep.contain({
+            [ATTR_EXCEPTION_MESSAGE]: "Error from syncFnWhichThrows"
+          });
+        });
+
+        it("should add an attribute to the span containing the stack trace from the original error", async () => {
+          try {
+            trace(syncFnWhichThrows);
+          } catch { }
+
+          const spans = await getSpans();
+          expect(spans[0].attributes).to.deep.contain({
+            [ATTR_EXCEPTION_STACKTRACE]: thrownError.stack
           });
         });
 
@@ -307,6 +330,28 @@ describe("Tracing instrumentation", () => {
               code: SpanStatusCode.ERROR,
               message: "Error from fnReturningPromiseLikeWithRejection"
             }
+          });
+        });
+
+        it("should add an attribute to the span containing the message from the original error", async () => {
+          try {
+            await trace(fnReturningPromiseLikeWithRejection);
+          } catch { }
+
+          const spans = await getSpans();
+          expect(spans[0].attributes).to.deep.contain({
+            [ATTR_EXCEPTION_MESSAGE]: "Error from fnReturningPromiseLikeWithRejection"
+          });
+        });
+
+        it("should add an attribute to the span containing the stack trace from the original error", async () => {
+          try {
+            await trace(fnReturningPromiseLikeWithRejection);
+          } catch { }
+
+          const spans = await getSpans();
+          expect(spans[0].attributes).to.deep.contain({
+            [ATTR_EXCEPTION_STACKTRACE]: thrownError.stack
           });
         });
 

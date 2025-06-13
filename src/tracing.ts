@@ -12,7 +12,12 @@ import {NodeSDK} from "@opentelemetry/sdk-node";
 import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-node";
 import {OTLPTraceExporter} from "@opentelemetry/exporter-trace-otlp-grpc";
 import {resourceFromAttributes} from "@opentelemetry/resources";
-import {ATTR_SERVICE_NAME} from "@opentelemetry/semantic-conventions";
+import {
+  ATTR_CODE_FUNCTION_NAME,
+  ATTR_EXCEPTION_MESSAGE,
+  ATTR_EXCEPTION_STACKTRACE,
+  ATTR_SERVICE_NAME,
+} from "@opentelemetry/semantic-conventions";
 import {
   AlwaysOnSampler,
   BatchSpanProcessor,
@@ -35,7 +40,6 @@ import {
   AwsSdkRequestHookInformation,
   AwsSdkSqsProcessHookInformation
 } from "@opentelemetry/instrumentation-aws-sdk";
-import {ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions/incubating";
 
 import {BtrzLogger, SimpleDao} from "./types/external.types";
 
@@ -282,10 +286,7 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
       result = functionToTrace();
     } catch (error: any) {
       synchronousError = error;
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error?.message
-      });
+      attachErrorToSpan(error, span);
     }
 
     if (isPromiseLike(result)) {
@@ -297,10 +298,7 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
           span.end();
           return result;
         }, (_error) => {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: _error?.message
-          });
+          attachErrorToSpan(_error, span);
           span.end();
           throw _error;
         });
@@ -377,6 +375,17 @@ function extractArguments<T extends unknown[], R>(
     traceOptions,
     functionToTrace
   };
+}
+
+function attachErrorToSpan(error: any, span: Span) {
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: error?.message
+  });
+  span.setAttributes({
+    [ATTR_EXCEPTION_MESSAGE]: error?.message,
+    [ATTR_EXCEPTION_STACKTRACE]: error?.stack
+  });
 }
 
 function isPromiseLike(value: any): value is PromiseLike<any> {

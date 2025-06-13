@@ -55,7 +55,6 @@ const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
-const incubating_1 = require("@opentelemetry/semantic-conventions/incubating");
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
@@ -227,7 +226,7 @@ function trace(arg1, arg2, arg3) {
     const spanOptions = {
         ..._spanOptions,
         attributes: {
-            [incubating_1.ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || getNameOfCallingFunction() || undefined,
+            [semantic_conventions_1.ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || getNameOfCallingFunction() || undefined,
             ...attributesToCopy,
             ...(_spanOptions.attributes || {})
         },
@@ -240,10 +239,7 @@ function trace(arg1, arg2, arg3) {
         }
         catch (error) {
             synchronousError = error;
-            span.setStatus({
-                code: api_1.SpanStatusCode.ERROR,
-                message: error?.message
-            });
+            attachErrorToSpan(error, span);
         }
         if (isPromiseLike(result)) {
             result
@@ -254,10 +250,7 @@ function trace(arg1, arg2, arg3) {
                 span.end();
                 return result;
             }, (_error) => {
-                span.setStatus({
-                    code: api_1.SpanStatusCode.ERROR,
-                    message: _error?.message
-                });
+                attachErrorToSpan(_error, span);
                 span.end();
                 throw _error;
             });
@@ -317,6 +310,16 @@ function extractArguments(arg1, arg2, arg3) {
         traceOptions,
         functionToTrace
     };
+}
+function attachErrorToSpan(error, span) {
+    span.setStatus({
+        code: api_1.SpanStatusCode.ERROR,
+        message: error?.message
+    });
+    span.setAttributes({
+        [semantic_conventions_1.ATTR_EXCEPTION_MESSAGE]: error?.message,
+        [semantic_conventions_1.ATTR_EXCEPTION_STACKTRACE]: error?.stack
+    });
 }
 function isPromiseLike(value) {
     return typeof value?.then === "function";

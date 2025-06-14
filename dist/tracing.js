@@ -212,7 +212,6 @@ function trace(arg1, arg2, arg3) {
     const { spanNameFromArgs, traceOptions, functionToTrace } = extractArguments(arg1, arg2, arg3);
     const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
     let result;
-    let synchronousError;
     const { inheritAttributesFromParentTrace, ..._spanOptions } = traceOptions;
     const activeSpan = api_1.trace.getActiveSpan();
     let attributesToCopy = {};
@@ -237,9 +236,10 @@ function trace(arg1, arg2, arg3) {
         try {
             result = functionToTrace();
         }
-        catch (error) {
-            synchronousError = error;
-            attachErrorToSpan(error, span);
+        catch (synchronousError) {
+            attachErrorToSpan(synchronousError, span);
+            span.end();
+            throw synchronousError;
         }
         if (isPromiseLike(result)) {
             result
@@ -256,17 +256,12 @@ function trace(arg1, arg2, arg3) {
             });
         }
         else {
-            if (!synchronousError) {
-                span.setStatus({
-                    code: api_1.SpanStatusCode.OK
-                });
-            }
+            span.setStatus({
+                code: api_1.SpanStatusCode.OK
+            });
             span.end();
         }
     });
-    if (synchronousError) {
-        throw synchronousError;
-    }
     return result;
 }
 function withTracing(arg1, arg2, arg3) {

@@ -290,7 +290,7 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
     }
 
     if (isPromiseLike(result)) {
-      result
+      result = Promise.resolve(result)
         .then((result) => {
           span.setStatus({
             code: SpanStatusCode.OK
@@ -301,7 +301,7 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
           attachErrorToSpan(_error, span);
           span.end();
           throw _error;
-        });
+        }) as R;
     } else {
       span.setStatus({
         code: SpanStatusCode.OK

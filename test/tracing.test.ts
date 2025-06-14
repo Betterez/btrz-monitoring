@@ -366,6 +366,39 @@ describe("Tracing instrumentation", () => {
       });
     });
 
+    context("when tracing an asynchronous arrow function", () => {
+      let unhandledRejectionDidOccur: boolean;
+
+      beforeEach(() => {
+        unhandledRejectionDidOccur = false;
+        process.on("unhandledRejection", unhandledRejectionListener);
+      });
+
+      afterEach(() => {
+        process.off("unhandledRejection", unhandledRejectionListener);
+      });
+
+      function unhandledRejectionListener() {
+        unhandledRejectionDidOccur = true;
+      }
+
+      it("should not cause an unhandled rejection when the function being traced rejects", async () => {
+        const thrownError = new Error("Some error");
+
+        try {
+          await trace(async () => {
+            throw thrownError;
+          });
+          expect.fail("Expected function to reject");
+        } catch (error) {
+
+          await new Promise((resolve) => setImmediate(resolve));
+          expect(error).to.equal(thrownError);
+          expect(unhandledRejectionDidOccur).to.be.false;
+        }
+      });
+    });
+
     context("when tracing an asynchronous non-arrow function", () => {
       async function asyncFn() {
         const randomDelay = Math.random() * 5;

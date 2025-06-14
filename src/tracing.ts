@@ -256,7 +256,6 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
   const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
 
   let result: R;
-  let synchronousError: any;
 
   const { inheritAttributesFromParentTrace, ..._spanOptions } = traceOptions;
   const activeSpan = otlpTrace.getActiveSpan();
@@ -284,9 +283,10 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
   tracer.startActiveSpan(spanName, spanOptions, (span) => {
     try {
       result = functionToTrace();
-    } catch (error: any) {
-      synchronousError = error;
-      attachErrorToSpan(error, span);
+    } catch (synchronousError: any) {
+      attachErrorToSpan(synchronousError, span);
+      span.end();
+      throw synchronousError;
     }
 
     if (isPromiseLike(result)) {
@@ -303,18 +303,12 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
           throw _error;
         });
     } else {
-      if (!synchronousError) {
-        span.setStatus({
-          code: SpanStatusCode.OK
-        });
-      }
+      span.setStatus({
+        code: SpanStatusCode.OK
+      });
       span.end();
     }
   });
-
-  if (synchronousError) {
-    throw synchronousError;
-  }
 
   return result!;
 }

@@ -242,7 +242,7 @@ function trace(arg1, arg2, arg3) {
             throw synchronousError;
         }
         if (isPromiseLike(result)) {
-            result
+            result = Promise.resolve(result)
                 .then((result) => {
                 span.setStatus({
                     code: api_1.SpanStatusCode.OK

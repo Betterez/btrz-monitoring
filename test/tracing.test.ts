@@ -4,7 +4,7 @@ import {__enableTestMode, initializeTracing, trace, withTracing} from "../src/tr
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
 import {ATTR_EXCEPTION_MESSAGE, ATTR_EXCEPTION_STACKTRACE, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions";
 import {ATTR_ARTIFACT_VERSION} from "@opentelemetry/semantic-conventions/incubating";
-import {Link, SpanKind, SpanStatusCode, TraceFlags} from "@opentelemetry/api";
+import {Link, SpanKind, SpanStatusCode, TraceFlags, trace as otlpTrace} from "@opentelemetry/api";
 
 describe("Tracing instrumentation", () => {
   let spanExporter: InMemorySpanExporter;
@@ -504,6 +504,18 @@ describe("Tracing instrumentation", () => {
         expect(secondSpan.attributes).to.deep.contain(parentSpanAttributes);
       });
 
+      it("should not fail when the parent span does not have an 'attributes' property (which can occur when the parent span is non-recording)", async () => {
+        trace("first trace", () => {
+          const activeSpan = otlpTrace.getActiveSpan();
+          delete (activeSpan as any).attributes;
+          trace("second trace", {inheritAttributesFromParentTrace: true}, () => {});
+        });
+
+        const spans = await getSpans();
+        const secondSpan = spans.find(span => span.name === "second trace")!;
+        expect(secondSpan.attributes).to.deep.equal({});
+      });
+
       it("should copy links from the parent span to the child span", async () => {
         const parentSpanLinks: Link[] = [{
           attributes: {},
@@ -523,6 +535,18 @@ describe("Tracing instrumentation", () => {
         expect(secondSpan.links).to.deep.equal(parentSpanLinks);
       });
 
+      it("should not fail when the parent span does not have a 'links' property (which can occur when the parent span is non-recording)", async () => {
+        trace("first trace", () => {
+          const activeSpan = otlpTrace.getActiveSpan();
+          delete (activeSpan as any).links;
+          trace("second trace", {inheritAttributesFromParentTrace: true}, () => {});
+        });
+
+        const spans = await getSpans();
+        const secondSpan = spans.find(span => span.name === "second trace")!;
+        expect(secondSpan.links).to.deep.equal([]);
+      });
+
       it("should copy the 'kind' property from the parent span to the child span", async () => {
         const parentSpanKind = SpanKind.CONSUMER;
 
@@ -533,6 +557,18 @@ describe("Tracing instrumentation", () => {
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
         expect(secondSpan.kind).to.equal(parentSpanKind);
+      });
+
+      it("should not fail when the parent span does not have a 'kind' property", async () => {
+        trace("first trace", () => {
+          const activeSpan = otlpTrace.getActiveSpan();
+          delete (activeSpan as any).kind;
+          trace("second trace", {inheritAttributesFromParentTrace: true}, () => {});
+        });
+
+        const spans = await getSpans();
+        const secondSpan = spans.find(span => span.name === "second trace")!;
+        expect(secondSpan.kind).to.equal(SpanKind.INTERNAL);
       });
 
       it("should not copy any attributes or links when the span has no parent", async () => {

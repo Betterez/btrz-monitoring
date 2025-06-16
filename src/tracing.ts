@@ -56,12 +56,15 @@ interface TracingInitOptions {
 }
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
-type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
-
 type HttpRoute = {
   method: HttpMethod;
   url: string | RegExp;
 }
+
+type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
+
+// NonRecordingSpan is an OpenTelemetry type that is not currently exported.  Fake it for our own use.
+type NonRecordingSpan = {};
 
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
@@ -258,15 +261,15 @@ export function trace<R>(arg1: string | TraceOptions | TraceableFunctionWithoutA
   let result: R;
 
   const { inheritAttributesFromParentTrace, ..._spanOptions } = traceOptions;
-  const activeSpan = otlpTrace.getActiveSpan();
+  const activeSpan: NonRecordingSpan | ReadableSpan | undefined = otlpTrace.getActiveSpan();
   let attributesToCopy: Attributes = {};
   let linksToCopy: Link[] = [];
   let spanKind = SpanKind.INTERNAL;
 
   if (inheritAttributesFromParentTrace && activeSpan) {
-    attributesToCopy = (activeSpan as unknown as ReadableSpan).attributes;
-    linksToCopy = (activeSpan as unknown as ReadableSpan).links;
-    spanKind = (activeSpan as unknown as ReadableSpan).kind;
+    attributesToCopy = getSpanAttributes(activeSpan);
+    linksToCopy = getSpanLinks(activeSpan);
+    spanKind = getSpanKind(activeSpan);
   }
 
   const spanOptions: SpanOptions = {
@@ -380,6 +383,27 @@ function attachErrorToSpan(error: any, span: Span) {
     [ATTR_EXCEPTION_MESSAGE]: error?.message,
     [ATTR_EXCEPTION_STACKTRACE]: error?.stack
   });
+}
+
+function getSpanAttributes(span?: NonRecordingSpan | ReadableSpan): Attributes {
+  if (!span || !(span as any).attributes) {
+    return {};
+  }
+  return (span as ReadableSpan).attributes;
+}
+
+function getSpanLinks(span?: NonRecordingSpan | ReadableSpan): Link[] {
+  if (!span || !(span as any).links) {
+    return [];
+  }
+  return (span as ReadableSpan).links;
+}
+
+function getSpanKind(span?: NonRecordingSpan | ReadableSpan): SpanKind {
+  if (!span || !(span as any).kind) {
+    return SpanKind.INTERNAL;
+  }
+  return (span as ReadableSpan).kind;
 }
 
 function isPromiseLike(value: any): value is PromiseLike<any> {

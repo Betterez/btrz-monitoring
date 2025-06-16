@@ -13,11 +13,11 @@ interface TracingInitOptions {
     enableFilesystemTracing?: boolean;
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
-type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
 type HttpRoute = {
     method: HttpMethod;
     url: string | RegExp;
 };
+type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
 export declare function initializeTracing(options: TracingInitOptions): {
     shutdownTracing: () => Promise<void>;
 };

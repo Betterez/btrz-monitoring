@@ -218,9 +218,9 @@ function trace(arg1, arg2, arg3) {
     let linksToCopy = [];
     let spanKind = api_1.SpanKind.INTERNAL;
     if (inheritAttributesFromParentTrace && activeSpan) {
-        attributesToCopy = activeSpan.attributes;
-        linksToCopy = activeSpan.links;
-        spanKind = activeSpan.kind;
+        attributesToCopy = getSpanAttributes(activeSpan);
+        linksToCopy = getSpanLinks(activeSpan);
+        spanKind = getSpanKind(activeSpan);
     }
     const spanOptions = {
         ..._spanOptions,
@@ -315,6 +315,24 @@ function attachErrorToSpan(error, span) {
         [semantic_conventions_1.ATTR_EXCEPTION_MESSAGE]: error?.message,
         [semantic_conventions_1.ATTR_EXCEPTION_STACKTRACE]: error?.stack
     });
+}
+function getSpanAttributes(span) {
+    if (!span || !span.attributes) {
+        return {};
+    }
+    return span.attributes;
+}
+function getSpanLinks(span) {
+    if (!span || !span.links) {
+        return [];
+    }
+    return span.links;
+}
+function getSpanKind(span) {
+    if (!span || !span.kind) {
+        return api_1.SpanKind.INTERNAL;
+    }
+    return span.kind;
 }
 function isPromiseLike(value) {
     return typeof value?.then === "function";

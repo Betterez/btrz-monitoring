@@ -266,7 +266,7 @@ function trace(arg1, arg2, arg3) {
 }
 function withTracing(arg1, arg2, arg3) {
     const { spanNameFromArgs, traceOptions, functionToTrace } = extractArguments(arg1, arg2, arg3);
-    const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
+    const spanName = spanNameFromArgs || simplifyFunctionName(functionToTrace.name) || getNameOfCallingFunction() || "unnamed trace";
     const wrapperFunction = (...args) => {
         const traceExecutor = () => functionToTrace(...args);
         Object.defineProperty(traceExecutor, "name", { value: functionToTrace.name });
@@ -345,7 +345,12 @@ function getNameOfCallingFunction() {
     // match parent function name
     const parentMatches = allMatches[2]?.match(/(\w+)@|at(.*) [(\/\\]/) ?? [];
     // return only name
-    return (parentMatches[1] || parentMatches[2] || "").trim();
+    return simplifyFunctionName(parentMatches[1] || parentMatches[2]);
+}
+function simplifyFunctionName(functionName) {
+    return (functionName || "")
+        .trim()
+        .replace(/^bound /, "");
 }
 /**
  * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a

@@ -326,7 +326,7 @@ export function withTracing<T extends unknown[], R>(arg1: string | TraceOptions 
     traceOptions,
     functionToTrace
   } = extractArguments(arg1, arg2, arg3);
-  const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
+  const spanName = spanNameFromArgs || simplifyFunctionName(functionToTrace.name) || getNameOfCallingFunction() || "unnamed trace";
 
   const wrapperFunction = (...args: T) => {
     const traceExecutor = () => functionToTrace(...args);
@@ -418,7 +418,13 @@ function getNameOfCallingFunction() {
     // match parent function name
     const parentMatches = allMatches[2]?.match(/(\w+)@|at(.*) [(\/\\]/) ?? [];
     // return only name
-    return (parentMatches[1] || parentMatches[2] || "").trim();
+    return simplifyFunctionName(parentMatches[1] || parentMatches[2]);
+}
+
+function simplifyFunctionName(functionName?: string) {
+  return (functionName || "")
+    .trim()
+    .replace(/^bound /, "");
 }
 
 /**

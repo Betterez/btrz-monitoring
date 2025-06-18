@@ -660,6 +660,17 @@ describe("Tracing instrumentation", () => {
       expect(spans[0].name).to.equal("originalFn");
     });
 
+    it("should omit the word 'bound' from the function name when the function being traced has been explicitly bound", async () => {
+      function originalFn() {
+      }
+
+      const tracedFn = withTracing(originalFn.bind({}));
+      tracedFn();
+
+      const spans = await getSpans();
+      expect(spans[0].name).to.equal("originalFn");
+    });
+
     it("should allow the user to provide a custom name for the span", async () => {
       function originalFn() {
       }

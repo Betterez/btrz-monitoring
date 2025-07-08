@@ -1,3 +1,4 @@
+import { NodeSDK } from "@opentelemetry/sdk-node";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanOptions } from "@opentelemetry/api";
 import { BtrzLogger, SimpleDao } from "./types/external.types";
@@ -47,4 +48,5 @@ export declare function __enableTestMode(): {
     spanExporter: InMemorySpanExporter;
     spanProcessor: SimpleSpanProcessor;
 };
+export declare function __getActiveOtlpSdkInstance(): NodeSDK | null;
 export {};

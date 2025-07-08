@@ -41,6 +41,7 @@ exports.trace = trace;
 exports.withTracing = withTracing;
 exports.warmUpDatabaseConnectionForTracing = warmUpDatabaseConnectionForTracing;
 exports.__enableTestMode = __enableTestMode;
+exports.__getActiveOtlpSdkInstance = __getActiveOtlpSdkInstance;
 const node_assert_1 = __importDefault(require("node:assert"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
@@ -55,6 +56,7 @@ const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
+let __activeOtlpSdkInstance = null;
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
@@ -127,6 +129,7 @@ function initializeTracing(options) {
                 }
             })]
     });
+    __activeOtlpSdkInstance = sdk;
     sdk.start();
     node_process_1.default.on("SIGTERM", async () => {
         try {
@@ -203,7 +206,9 @@ function shutdownTracing(sdk) {
         catch (error) {
             console.error(chalk_1.default.red("[btrz-monitoring] Error while stopping tracing"));
             console.error(chalk_1.default.red(util.inspect(error)));
-            throw error;
+        }
+        finally {
+            __activeOtlpSdkInstance = null;
         }
     };
 }
@@ -387,5 +392,8 @@ function __enableTestMode() {
         spanExporter: global.__btrz_monitoring__spanExporterForTests,
         spanProcessor: global.__btrz_monitoring__spanProcessorForTests
     };
+}
+function __getActiveOtlpSdkInstance() {
+    return __activeOtlpSdkInstance;
 }
 //# sourceMappingURL=tracing.js.map

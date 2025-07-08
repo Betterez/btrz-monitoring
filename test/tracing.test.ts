@@ -1,6 +1,13 @@
 import _ from "lodash";
 import {expect} from "chai";
-import {__enableTestMode, initializeTracing, trace, withTracing} from "../src/tracing";
+import * as sinon from "sinon";
+import {
+  __enableTestMode,
+  __getActiveOtlpSdkInstance,
+  initializeTracing,
+  trace,
+  withTracing
+} from "../src/tracing";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
 import {ATTR_EXCEPTION_MESSAGE, ATTR_EXCEPTION_STACKTRACE, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions";
 import {ATTR_ARTIFACT_VERSION} from "@opentelemetry/semantic-conventions/incubating";
@@ -23,12 +30,43 @@ describe("Tracing instrumentation", () => {
 
   afterEach(() => {
     spanExporter.reset();
+    sinon.restore();
   });
 
   async function getSpans() {
     await spanProcessor.forceFlush();
     return spanExporter.getFinishedSpans();
   }
+
+  describe("initializeTracing()", () => {
+    it("should return a shutdownTracing() function which gracefully shuts down the tracing instrumentation", async () => {
+      const {shutdownTracing} = initializeTracing({
+        serviceName: "btrz-monitoring-tests",
+        traceDestinationUrl: "http://localhost:4317"
+      });
+
+      expect(shutdownTracing).to.be.a("function");
+
+      const sdk = __getActiveOtlpSdkInstance()!;
+      const sdkShutdownStub = sinon.stub(sdk, "shutdown").resolves();
+
+      await shutdownTracing();
+      expect(sdkShutdownStub.calledOnce).to.be.true;
+    });
+
+    it("should return a shutdownTracing() function that swallows any errors which occur when shutting down the tracing instrumentation", async () => {
+      const {shutdownTracing} = initializeTracing({
+        serviceName: "btrz-monitoring-tests",
+        traceDestinationUrl: "http://localhost:4317"
+      });
+
+      const sdk = __getActiveOtlpSdkInstance()!;
+      sinon.stub(sdk, "shutdown").rejects(new Error("Some error"));
+
+      await shutdownTracing();
+      // If no rejection occurred, the test has passed.
+    });
+  });
 
   describe("trace()", () => {
     context("when tracing a synchronous non-arrow function", () => {

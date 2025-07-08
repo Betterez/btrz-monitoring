@@ -66,6 +66,8 @@ type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
 // NonRecordingSpan is an OpenTelemetry type that is not currently exported.  Fake it for our own use.
 type NonRecordingSpan = {};
 
+let __activeOtlpSdkInstance: NodeSDK | null = null;
+
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 export function initializeTracing(options: TracingInitOptions) {
@@ -155,6 +157,7 @@ export function initializeTracing(options: TracingInitOptions) {
     })]
   });
 
+  __activeOtlpSdkInstance = sdk;
   sdk.start();
 
   process.on("SIGTERM", async () => {
@@ -235,7 +238,8 @@ function shutdownTracing(sdk: NodeSDK) {
     } catch (error) {
       console.error(chalk.red("[btrz-monitoring] Error while stopping tracing"));
       console.error(chalk.red(util.inspect(error)));
-      throw error;
+    } finally {
+      __activeOtlpSdkInstance = null;
     }
   }
 }
@@ -463,4 +467,8 @@ export function __enableTestMode() {
     spanExporter: global.__btrz_monitoring__spanExporterForTests,
     spanProcessor: global.__btrz_monitoring__spanProcessorForTests
   };
+}
+
+export function __getActiveOtlpSdkInstance(): NodeSDK | null {
+  return __activeOtlpSdkInstance;
 }

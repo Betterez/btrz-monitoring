@@ -36,6 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.monitoringAttributes = void 0;
 exports.initializeTracing = initializeTracing;
 exports.trace = trace;
 exports.withTracing = withTracing;
@@ -53,9 +54,14 @@ const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
 const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
 const resources_1 = require("@opentelemetry/resources");
+const semanticConventions = __importStar(require("@opentelemetry/semantic-conventions"));
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
+exports.monitoringAttributes = {
+    ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
+    ...semanticConventions
+};
 let __activeOtlpSdkInstance = null;
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
@@ -124,6 +130,13 @@ function initializeTracing(options) {
                     sqsProcessHook(span, sqsProcessInfo) {
                         if (ignoredAwsSqsEvents.includes("ProcessMessage")) {
                             span.spanContext().traceFlags = api_1.TraceFlags.NONE;
+                        }
+                    }
+                },
+                "@opentelemetry/instrumentation-express": {
+                    requestHook(span, info) {
+                        if (info.request.account?.accountId) {
+                            span.setAttribute(exports.monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.account.accountId);
                         }
                     }
                 }

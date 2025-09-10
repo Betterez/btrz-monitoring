@@ -12,6 +12,7 @@ import {NodeSDK} from "@opentelemetry/sdk-node";
 import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-node";
 import {OTLPTraceExporter} from "@opentelemetry/exporter-trace-otlp-grpc";
 import {resourceFromAttributes} from "@opentelemetry/resources";
+import * as semanticConventions from "@opentelemetry/semantic-conventions";
 import {
   ATTR_CODE_FUNCTION_NAME,
   ATTR_EXCEPTION_MESSAGE,
@@ -65,6 +66,11 @@ type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
 
 // NonRecordingSpan is an OpenTelemetry type that is not currently exported.  Fake it for our own use.
 type NonRecordingSpan = {};
+
+export const monitoringAttributes = {
+  ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
+  ...semanticConventions
+} as const;
 
 let __activeOtlpSdkInstance: NodeSDK | null = null;
 
@@ -151,6 +157,13 @@ export function initializeTracing(options: TracingInitOptions) {
         sqsProcessHook(span: Span, sqsProcessInfo: AwsSdkSqsProcessHookInformation) {
           if (ignoredAwsSqsEvents.includes("ProcessMessage")) {
             span.spanContext().traceFlags = TraceFlags.NONE;
+          }
+        }
+      },
+      "@opentelemetry/instrumentation-express": {
+        requestHook(span, info) {
+          if (info.request.account?.accountId) {
+            span.setAttribute(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.account.accountId);
           }
         }
       }

@@ -166,6 +166,12 @@ export function initializeTracing(options: TracingInitOptions) {
         requestHook(span, info) {
           if (info.request.account?.accountId) {
             span.setAttribute(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.account.accountId);
+          } else if (info.request.session?.account?._id) {
+            span.setAttribute(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.session.account._id);
+          }
+
+          if (info.request.session?.networkContext?.providerIds) {
+            span.setAttribute(monitoringAttributes.ATTR_BTRZ_PROVIDER_ID, info.request.session.networkContext.providerIds);
           }
         }
       }

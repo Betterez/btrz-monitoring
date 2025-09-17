@@ -10,6 +10,8 @@ import {
   initializeTracing,
   trace,
   withTracing,
+  getActiveSpan,
+  setAttributeOnSpan,
   setAttributeOnActiveSpan,
 } from "../src/tracing";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
@@ -781,9 +783,47 @@ describe("Tracing instrumentation", () => {
     });
   });
 
+  describe("getActiveSpan()", () => {
+    it("should return the active span", async () => {
+      let activeSpan;
+
+      trace("some-span-name", () => {
+        activeSpan = getActiveSpan();
+      });
+
+      expect(activeSpan).to.exist;
+      expect(activeSpan!.name).to.equal("some-span-name");
+    });
+
+    it("should return undefined if there is no active span", async () => {
+      const activeSpan = getActiveSpan();
+      expect(activeSpan).to.be.undefined;
+    });
+  });
+
+  describe("setAttributeOnSpan()", () => {
+    it("should do nothing if no span is provided", async () => {
+      setAttributeOnSpan(undefined, monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ef");
+
+      const spans = await getSpans();
+      expect(spans).to.be.an("array").with.length(0);
+    });
+
+    it("should set the value of the requested attribute on the provided span", async () => {
+      trace("some-span-name", () => {
+        const span = getActiveSpan();
+        setAttributeOnSpan(span, monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ea");
+      });
+
+      const spans = await getSpans();
+      expect(spans).to.be.an("array").with.length(1);
+      expect(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID]).to.eql("66d8a8e0530153052b3953ea");
+    });
+  });
+
   describe("setAttributeOnActiveSpan()", () => {
     it("should do nothing if there is no active span", async () => {
-      setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ee");
+      setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953e1");
 
       const spans = await getSpans();
       expect(spans).to.be.an("array").with.length(0);
@@ -791,12 +831,12 @@ describe("Tracing instrumentation", () => {
 
     it("should set the value of the requested attribute on the active span", async () => {
       trace("some-span-name", () => {
-        setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ee");
+        setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953e2");
       });
 
       const spans = await getSpans();
       expect(spans).to.be.an("array").with.length(1);
-      expect(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID]).to.eql("66d8a8e0530153052b3953ee");
+      expect(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID]).to.eql("66d8a8e0530153052b3953e2");
     });
   });
 });

@@ -446,12 +446,23 @@ function simplifyFunctionName(functionName?: string) {
     .replace(/^bound /, "");
 }
 
+export function getActiveSpan(): Span | undefined {
+  return otlpTrace.getActiveSpan();
+}
+
+export function setAttributeOnSpan(
+  span: Span | undefined,
+  key: typeof monitoringAttributes[keyof typeof monitoringAttributes],
+  value: AttributeValue
+) {
+  span?.setAttribute(key as string,  value);
+}
+
 export function setAttributeOnActiveSpan(
   key: typeof monitoringAttributes[keyof typeof monitoringAttributes],
   value: AttributeValue
 ) {
-  const activeSpan = otlpTrace.getActiveSpan();
-  activeSpan?.setAttribute(key as string,  value);
+  return setAttributeOnSpan(otlpTrace.getActiveSpan(), key, value);
 }
 
 /**

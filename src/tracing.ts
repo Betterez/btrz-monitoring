@@ -29,13 +29,14 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import {
   Attributes,
+  AttributeValue,
   Link,
   Span,
   SpanKind,
   SpanStatusCode,
   SpanOptions,
   trace as otlpTrace,
-  TraceFlags
+  TraceFlags,
 } from "@opentelemetry/api";
 import {
   AwsSdkRequestHookInformation,
@@ -69,6 +70,7 @@ type NonRecordingSpan = {};
 
 export const monitoringAttributes = {
   ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
+  ATTR_BTRZ_PROVIDER_IDS: "btrz.provider.ids",
   ...semanticConventions
 } as const;
 
@@ -442,6 +444,14 @@ function simplifyFunctionName(functionName?: string) {
   return (functionName || "")
     .trim()
     .replace(/^bound /, "");
+}
+
+export function setAttributeOnActiveSpan(
+  key: typeof monitoringAttributes[keyof typeof monitoringAttributes],
+  value: AttributeValue
+) {
+  const activeSpan = otlpTrace.getActiveSpan();
+  activeSpan?.setAttribute(key as string,  value);
 }
 
 /**

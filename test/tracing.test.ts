@@ -6,9 +6,11 @@ import * as sinon from "sinon";
 import {
   __enableTestMode,
   __getActiveOtlpSdkInstance,
+  monitoringAttributes,
   initializeTracing,
   trace,
-  withTracing
+  withTracing,
+  setAttributeOnActiveSpan,
 } from "../src/tracing";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
 import {ATTR_EXCEPTION_MESSAGE, ATTR_EXCEPTION_STACKTRACE, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions";
@@ -776,6 +778,25 @@ describe("Tracing instrumentation", () => {
         const spans = await getSpans();
         expect(spans[0].name).to.be.equal("unnamed trace");
       });
+    });
+  });
+
+  describe("setAttributeOnActiveSpan()", () => {
+    it("should do nothing if there is no active span", async () => {
+      setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ee");
+
+      const spans = await getSpans();
+      expect(spans).to.be.an("array").with.length(0);
+    });
+
+    it("should set the value of the requested attribute on the active span", async () => {
+      trace("some-span-name", () => {
+        setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ee");
+      });
+
+      const spans = await getSpans();
+      expect(spans).to.be.an("array").with.length(1);
+      expect(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID]).to.eql("66d8a8e0530153052b3953ee");
     });
   });
 });

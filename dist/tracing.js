@@ -40,6 +40,8 @@ exports.monitoringAttributes = void 0;
 exports.initializeTracing = initializeTracing;
 exports.trace = trace;
 exports.withTracing = withTracing;
+exports.getActiveSpan = getActiveSpan;
+exports.setAttributeOnSpan = setAttributeOnSpan;
 exports.setAttributeOnActiveSpan = setAttributeOnActiveSpan;
 exports.warmUpDatabaseConnectionForTracing = warmUpDatabaseConnectionForTracing;
 exports.__enableTestMode = __enableTestMode;
@@ -372,9 +374,14 @@ function simplifyFunctionName(functionName) {
         .trim()
         .replace(/^bound /, "");
 }
+function getActiveSpan() {
+    return api_1.trace.getActiveSpan();
+}
+function setAttributeOnSpan(span, key, value) {
+    span?.setAttribute(key, value);
+}
 function setAttributeOnActiveSpan(key, value) {
-    const activeSpan = api_1.trace.getActiveSpan();
-    activeSpan?.setAttribute(key, value);
+    return setAttributeOnSpan(api_1.trace.getActiveSpan(), key, value);
 }
 /**
  * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a

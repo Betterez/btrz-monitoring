@@ -1,7 +1,7 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import * as semanticConventions from "@opentelemetry/semantic-conventions";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { AttributeValue, SpanOptions } from "@opentelemetry/api";
+import { AttributeValue, Span, SpanOptions } from "@opentelemetry/api";
 import { BtrzLogger, SimpleDao } from "./types/external.types";
 interface TracingInitOptions {
     enabled?: boolean;
@@ -637,6 +637,8 @@ export declare function withTracing<T extends unknown[], R>(fn: TraceableFunctio
 export declare function withTracing<T extends unknown[], R>(spanName: string, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
 export declare function withTracing<T extends unknown[], R>(options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
 export declare function withTracing<T extends unknown[], R>(spanName: string, options: TraceOptions, fn: TraceableFunction<T, R>): TraceableFunction<T, R>;
+export declare function getActiveSpan(): Span | undefined;
+export declare function setAttributeOnSpan(span: Span | undefined, key: typeof monitoringAttributes[keyof typeof monitoringAttributes], value: AttributeValue): void;
 export declare function setAttributeOnActiveSpan(key: typeof monitoringAttributes[keyof typeof monitoringAttributes], value: AttributeValue): void;
 /**
  * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a

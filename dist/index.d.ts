@@ -1,1 +1,1 @@
-export { initializeTracing, warmUpDatabaseConnectionForTracing, trace, withTracing, setAttributeOnActiveSpan, monitoringAttributes } from "./tracing";
+export { initializeTracing, warmUpDatabaseConnectionForTracing, trace, withTracing, getActiveSpan, setAttributeOnSpan, setAttributeOnActiveSpan, monitoringAttributes } from "./tracing";

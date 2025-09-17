@@ -61,7 +61,7 @@ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
 exports.monitoringAttributes = {
     ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
-    ATTR_BTRZ_PROVIDER_IDS: "btrz.provider.ids",
+    ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id",
     ...semanticConventions
 };
 let __activeOtlpSdkInstance = null;

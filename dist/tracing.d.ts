@@ -619,7 +619,7 @@ export declare const monitoringAttributes: {
     readonly METRIC_SIGNALR_SERVER_ACTIVE_CONNECTIONS: "signalr.server.active_connections";
     readonly METRIC_SIGNALR_SERVER_CONNECTION_DURATION: "signalr.server.connection.duration";
     readonly ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id";
-    readonly ATTR_BTRZ_PROVIDER_IDS: "btrz.provider.ids";
+    readonly ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id";
 };
 export declare function initializeTracing(options: TracingInitOptions): {
     shutdownTracing: () => Promise<void>;

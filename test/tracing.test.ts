@@ -1,3 +1,5 @@
+import "../src/types/global.types";
+
 import _ from "lodash";
 import {expect} from "chai";
 import * as sinon from "sinon";
@@ -22,10 +24,15 @@ describe("Tracing instrumentation", () => {
     spanExporter = testDependencies.spanExporter;
     spanProcessor = testDependencies.spanProcessor;
 
-    initializeTracing({
-      serviceName: "btrz-monitoring-tests",
-      traceDestinationUrl: "http://localhost:4317"
-    });
+    // When running mocha tests in "watch" mode, the tracing instrumentation must be initialized only once (during the
+    // first test run) or a stack overflow will eventually occur.
+    if (!global.__btrz_monitoring__didInitializeTracing) {
+      global.__btrz_monitoring__didInitializeTracing = true;
+      initializeTracing({
+        serviceName: "btrz-monitoring-tests",
+        traceDestinationUrl: "http://localhost:4317"
+      });
+    }
   });
 
   afterEach(() => {

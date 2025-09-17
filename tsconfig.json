@@ -16,9 +16,4 @@
   },
   "include": ["src/**/*"],
   "exclude": ["test/*"],
-
-  // Mocha tests currently fail to compile unless this file is explicitly included
-  "files": [
-    "src/types/global.d.ts"
-  ]
 }

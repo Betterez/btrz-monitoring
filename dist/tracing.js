@@ -40,6 +40,7 @@ exports.monitoringAttributes = void 0;
 exports.initializeTracing = initializeTracing;
 exports.trace = trace;
 exports.withTracing = withTracing;
+exports.setAttributeOnActiveSpan = setAttributeOnActiveSpan;
 exports.warmUpDatabaseConnectionForTracing = warmUpDatabaseConnectionForTracing;
 exports.__enableTestMode = __enableTestMode;
 exports.__getActiveOtlpSdkInstance = __getActiveOtlpSdkInstance;
@@ -60,6 +61,7 @@ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
 exports.monitoringAttributes = {
     ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
+    ATTR_BTRZ_PROVIDER_IDS: "btrz.provider.ids",
     ...semanticConventions
 };
 let __activeOtlpSdkInstance = null;
@@ -369,6 +371,10 @@ function simplifyFunctionName(functionName) {
     return (functionName || "")
         .trim()
         .replace(/^bound /, "");
+}
+function setAttributeOnActiveSpan(key, value) {
+    const activeSpan = api_1.trace.getActiveSpan();
+    activeSpan?.setAttribute(key, value);
 }
 /**
  * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a

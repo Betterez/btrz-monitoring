@@ -70,7 +70,7 @@ type NonRecordingSpan = {};
 
 export const monitoringAttributes = {
   ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
-  ATTR_BTRZ_PROVIDER_IDS: "btrz.provider.ids",
+  ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id",
   ...semanticConventions
 } as const;
 

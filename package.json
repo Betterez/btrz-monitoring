@@ -15,7 +15,7 @@
     "delete-compiled-code": "rm -rf dist/",
     "commit-compiled-code": "git add --force dist/ && git commit --allow-empty -m \"Compiled code\"",
     "preversion": "npm test && npm run delete-compiled-code && npm run compile && npm run commit-compiled-code",
-    "postversion": "git push origin main && git push --tags"
+    "postversion": "git push origin master && git push --tags"
   },
   "author": "Betterez Inc.",
   "license": "ISC",

@@ -1,7 +1,7 @@
 import "../src/types/global.types";
 
-import _ from "lodash";
-import {expect} from "chai";
+import assert from "node:assert/strict";
+import {afterEach, before, beforeEach, describe, it} from "node:test";
 import * as sinon from "sinon";
 import {
   __enableTestMode,
@@ -28,7 +28,7 @@ describe("Tracing instrumentation", () => {
     spanExporter = testDependencies.spanExporter;
     spanProcessor = testDependencies.spanProcessor;
 
-    // When running mocha tests in "watch" mode, the tracing instrumentation must be initialized only once (during the
+    // When running tests in "watch" mode, the tracing instrumentation must be initialized only once (during the
     // first test run) or a stack overflow will eventually occur.
     if (!global.__btrz_monitoring__didInitializeTracing) {
       global.__btrz_monitoring__didInitializeTracing = true;
@@ -56,13 +56,13 @@ describe("Tracing instrumentation", () => {
         traceDestinationUrl: "http://localhost:4317"
       });
 
-      expect(shutdownTracing).to.be.a("function");
+      assert.equal(typeof shutdownTracing, "function");
 
       const sdk = __getActiveOtlpSdkInstance()!;
       const sdkShutdownStub = sinon.stub(sdk, "shutdown").resolves();
 
       await shutdownTracing();
-      expect(sdkShutdownStub.calledOnce).to.be.true;
+      assert.equal(sdkShutdownStub.calledOnce, true);
     });
 
     it("should return a shutdownTracing() function that swallows any errors which occur when shutting down the tracing instrumentation", async () => {
@@ -80,7 +80,7 @@ describe("Tracing instrumentation", () => {
   });
 
   describe("trace()", () => {
-    context("when tracing a synchronous non-arrow function", () => {
+    describe("when tracing a synchronous non-arrow function", () => {
       function syncFn() {
         let i = 0;
         while (i < 100000) {
@@ -92,61 +92,53 @@ describe("Tracing instrumentation", () => {
       it("should generate a single span which has ended", async () => {
         trace(syncFn);
         const spans = await getSpans();
-        expect(spans).to.have.length(1);
-        expect(spans[0].ended).to.be.true;
+        assert.equal(spans.length, 1);
+        assert.equal(spans[0].ended, true);
       });
 
       it("should generate a span which is named after the function that is being traced", async () => {
         trace(syncFn);
         const spans = await getSpans();
-        expect(spans[0].name).to.equal("syncFn");
+        assert.equal(spans[0].name, "syncFn");
       });
 
       it("should allow the user to provide a custom name for the span", async () => {
         trace("my-span-name", syncFn);
         const spans = await getSpans();
-        expect(spans[0].name).to.equal("my-span-name");
+        assert.equal(spans[0].name, "my-span-name");
       });
 
       it("should allow the user to provide options which affect the properties of the span", async () => {
         trace({kind: SpanKind.PRODUCER}, syncFn);
         const spans = await getSpans();
-        expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+        assert.equal(spans[0].kind, SpanKind.PRODUCER);
       });
 
       it("should allow the user to provide both a span name as well as options which affect the properties of the span", async () => {
         trace("my-span-name", {kind: SpanKind.PRODUCER}, syncFn);
         const spans = await getSpans();
-        expect(spans[0].name).to.equal("my-span-name");
-        expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+        assert.equal(spans[0].name, "my-span-name");
+        assert.equal(spans[0].kind, SpanKind.PRODUCER);
       });
 
       it("should add an attribute to the span with the name of the function", async () => {
         trace(syncFn);
         const spans = await getSpans();
-        expect(spans[0]).to.deep.contain({
-          attributes: {
-            [ATTR_CODE_FUNCTION_NAME]: "syncFn"
-          }
-        });
+        assert.equal(spans[0].attributes[ATTR_CODE_FUNCTION_NAME], "syncFn");
       });
 
       it("should generate a span with a status code that indicates that the function returned successfully", async () => {
         trace(syncFn);
         const spans = await getSpans();
-        expect(spans[0]).to.deep.contain({
-          status: {
-            code: SpanStatusCode.OK
-          }
-        });
+        assert.equal(spans[0].status.code, SpanStatusCode.OK);
       });
 
       it("should return the same return value as the function being traced", async () => {
         const result = trace(syncFn);
-        expect(result).to.equal("syncFn return value");
+        assert.equal(result, "syncFn return value");
       });
 
-      context("when the function throws an error", () => {
+      describe("when the function throws an error", () => {
         const thrownError = new Error("Error from syncFnWhichThrows");
 
         function syncFnWhichThrows() {
@@ -159,8 +151,8 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans).to.have.length(1);
-          expect(spans[0].ended).to.be.true;
+          assert.equal(spans.length, 1);
+          assert.equal(spans[0].ended, true);
         });
 
         it("should generate a span with an 'error' status code, and the message contained in the original error", async () => {
@@ -169,12 +161,8 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0]).to.deep.contain({
-            status: {
-              code: SpanStatusCode.ERROR,
-              message: "Error from syncFnWhichThrows"
-            }
-          });
+          assert.equal(spans[0].status.code, SpanStatusCode.ERROR);
+          assert.equal(spans[0].status.message, "Error from syncFnWhichThrows");
         });
 
         it("should add an attribute to the span containing the message from the original error", async () => {
@@ -183,9 +171,7 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0].attributes).to.deep.contain({
-            [ATTR_EXCEPTION_MESSAGE]: "Error from syncFnWhichThrows"
-          });
+          assert.equal(spans[0].attributes[ATTR_EXCEPTION_MESSAGE], "Error from syncFnWhichThrows");
         });
 
         it("should add an attribute to the span containing the stack trace from the original error", async () => {
@@ -194,23 +180,21 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0].attributes).to.deep.contain({
-            [ATTR_EXCEPTION_STACKTRACE]: thrownError.stack
-          });
+          assert.equal(spans[0].attributes[ATTR_EXCEPTION_STACKTRACE], thrownError.stack);
         });
 
         it("should throw the error originally thrown by the function being traced", async () => {
           try {
             trace(syncFnWhichThrows);
-            expect.fail("Expected an error to be thrown");
+            assert.fail("Expected an error to be thrown");
           } catch (error){
-            expect(error).to.equal(thrownError);
+            assert.equal(error, thrownError);
           }
         });
       });
     });
 
-    context("when tracing a synchronous arrow function", () => {
+    describe("when tracing a synchronous arrow function", () => {
       const syncArrowFn = () => {
         let i = 0;
         while (i < 100000) {
@@ -222,20 +206,16 @@ describe("Tracing instrumentation", () => {
       it("should generate a span which is named after the function", async () => {
         trace(syncArrowFn);
         const spans = await getSpans();
-        expect(spans[0].name).to.equal("syncArrowFn");
+        assert.equal(spans[0].name, "syncArrowFn");
       });
 
       it("should add an attribute to the span with the name of the function", async () => {
         trace(syncArrowFn);
         const spans = await getSpans();
-        expect(spans[0]).to.deep.contain({
-          attributes: {
-            [ATTR_CODE_FUNCTION_NAME]: "syncArrowFn"
-          }
-        });
+        assert.equal(spans[0].attributes[ATTR_CODE_FUNCTION_NAME], "syncArrowFn");
       });
 
-      context("when the function being traced is anonymous", () => {
+      describe("when the function being traced is anonymous", () => {
         it("should generate a span with the name of the calling function", async () => {
           function callingFunction() {
             trace(() => "anonymous arrow function return value");
@@ -243,7 +223,7 @@ describe("Tracing instrumentation", () => {
 
           callingFunction();
           const spans = await getSpans();
-          expect(spans[0].name).to.equal("callingFunction");
+          assert.equal(spans[0].name, "callingFunction");
         });
 
         it("should add an attribute to the span with the name of the calling function", async () => {
@@ -253,7 +233,7 @@ describe("Tracing instrumentation", () => {
 
           callingFunction();
           const spans = await getSpans();
-          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.equal("callingFunction");
+          assert.equal(spans[0].attributes[ATTR_CODE_FUNCTION_NAME], "callingFunction");
         });
 
         it("should generate a span with the name of the calling function when the calling function is an arrow function that has been assigned to a variable", async () => {
@@ -263,7 +243,7 @@ describe("Tracing instrumentation", () => {
 
           callingFunction();
           const spans = await getSpans();
-          expect(spans[0].name).to.equal("callingFunction");
+          assert.equal(spans[0].name, "callingFunction");
         });
 
         it("should add an attribute to the span with the name of the calling function when the calling function is an arrow function that has been assigned to a variable", async () => {
@@ -273,7 +253,7 @@ describe("Tracing instrumentation", () => {
 
           callingFunction();
           const spans = await getSpans();
-          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.equal("callingFunction");
+          assert.equal(spans[0].attributes[ATTR_CODE_FUNCTION_NAME], "callingFunction");
         });
 
         it("should not add an attribute to the span with the name of the function when called within an anonymous function expression", async () => {
@@ -282,7 +262,7 @@ describe("Tracing instrumentation", () => {
           })();
 
           const spans = await getSpans();
-          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.be.undefined;
+          assert.equal(spans[0].attributes[ATTR_CODE_FUNCTION_NAME], undefined);
         });
 
         it("should give the span the name 'unnamed trace' when called within an anonymous function expression", async () => {
@@ -291,7 +271,7 @@ describe("Tracing instrumentation", () => {
           })();
 
           const spans = await getSpans();
-          expect(spans[0].name).to.be.equal("unnamed trace");
+          assert.equal(spans[0].name, "unnamed trace");
         });
 
         it("should not add an attribute to the span with the name of the function when called within an anonymous arrow function expression", async () => {
@@ -300,7 +280,7 @@ describe("Tracing instrumentation", () => {
           })();
 
           const spans = await getSpans();
-          expect(spans[0].attributes[ATTR_CODE_FUNCTION_NAME]).to.be.undefined;
+          assert.equal(spans[0].attributes[ATTR_CODE_FUNCTION_NAME], undefined);
         });
 
         it("should give the span the name 'unnamed trace' when called within an anonymous arrow function expression", async () => {
@@ -309,12 +289,12 @@ describe("Tracing instrumentation", () => {
           })();
 
           const spans = await getSpans();
-          expect(spans[0].name).to.be.equal("unnamed trace");
+          assert.equal(spans[0].name, "unnamed trace");
         });
       });
     });
 
-    context("when tracing a function which returns a promise-like object", () => {
+    describe("when tracing a function which returns a promise-like object", () => {
       function fnReturningPromiseLike() {
         const randomDelay = Math.random() * 5;
 
@@ -328,11 +308,11 @@ describe("Tracing instrumentation", () => {
       it("should generate a single span which has ended", async () => {
         await trace(fnReturningPromiseLike);
         const spans = await getSpans();
-        expect(spans).to.have.length(1);
-        expect(spans[0].ended).to.be.true;
+        assert.equal(spans.length, 1);
+        assert.equal(spans[0].ended, true);
       });
 
-      context("when the function rejects", () => {
+      describe("when the function rejects", () => {
         const thrownError = new Error("Error from fnReturningPromiseLikeWithRejection");
         const rejectWith = (value: any) => {
           return {
@@ -364,8 +344,8 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans).to.have.length(1);
-          expect(spans[0].ended).to.be.true;
+          assert.equal(spans.length, 1);
+          assert.equal(spans[0].ended, true);
         });
 
         it("should generate a span with an 'error' status code, and the message contained in the original error", async () => {
@@ -374,12 +354,8 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0]).to.deep.contain({
-            status: {
-              code: SpanStatusCode.ERROR,
-              message: "Error from fnReturningPromiseLikeWithRejection"
-            }
-          });
+          assert.equal(spans[0].status.code, SpanStatusCode.ERROR);
+          assert.equal(spans[0].status.message, "Error from fnReturningPromiseLikeWithRejection");
         });
 
         it("should add an attribute to the span containing the message from the original error", async () => {
@@ -388,9 +364,7 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0].attributes).to.deep.contain({
-            [ATTR_EXCEPTION_MESSAGE]: "Error from fnReturningPromiseLikeWithRejection"
-          });
+          assert.equal(spans[0].attributes[ATTR_EXCEPTION_MESSAGE], "Error from fnReturningPromiseLikeWithRejection");
         });
 
         it("should add an attribute to the span containing the stack trace from the original error", async () => {
@@ -399,23 +373,21 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0].attributes).to.deep.contain({
-            [ATTR_EXCEPTION_STACKTRACE]: thrownError.stack
-          });
+          assert.equal(spans[0].attributes[ATTR_EXCEPTION_STACKTRACE], thrownError.stack);
         });
 
         it("should reject with the error originally thrown by the function being traced", async () => {
           try {
             await trace(fnReturningPromiseLikeWithRejection);
-            expect.fail("Expected an error to be thrown");
+            assert.fail("Expected an error to be thrown");
           } catch (error){
-            expect(error).to.equal(thrownError);
+            assert.equal(error, thrownError);
           }
         });
       });
     });
 
-    context("when tracing an asynchronous arrow function", () => {
+    describe("when tracing an asynchronous arrow function", () => {
       let unhandledRejectionDidOccur: boolean;
 
       beforeEach(() => {
@@ -438,17 +410,17 @@ describe("Tracing instrumentation", () => {
           await trace(async () => {
             throw thrownError;
           });
-          expect.fail("Expected function to reject");
+          assert.fail("Expected function to reject");
         } catch (error) {
 
           await new Promise((resolve) => setImmediate(resolve));
-          expect(error).to.equal(thrownError);
-          expect(unhandledRejectionDidOccur).to.be.false;
+          assert.equal(error, thrownError);
+          assert.equal(unhandledRejectionDidOccur, false);
         }
       });
     });
 
-    context("when tracing an asynchronous non-arrow function", () => {
+    describe("when tracing an asynchronous non-arrow function", () => {
       async function asyncFn() {
         const randomDelay = Math.random() * 5;
         await new Promise((resolve) => setTimeout(resolve, randomDelay));
@@ -458,26 +430,22 @@ describe("Tracing instrumentation", () => {
       it("should generate a single span which has ended", async () => {
         await trace(asyncFn);
         const spans = await getSpans();
-        expect(spans).to.have.length(1);
-        expect(spans[0].ended).to.be.true;
+        assert.equal(spans.length, 1);
+        assert.equal(spans[0].ended, true);
       });
 
       it("should generate a span with a status code that indicates that the function resolved successfully", async () => {
         await trace(asyncFn);
         const spans = await getSpans();
-        expect(spans[0]).to.deep.contain({
-          status: {
-            code: SpanStatusCode.OK
-          }
-        });
+        assert.equal(spans[0].status.code, SpanStatusCode.OK);
       });
 
       it("should resolve with the same value as the function being traced", async () => {
         const result = await trace(asyncFn);
-        expect(result).to.equal("asyncFn return value");
+        assert.equal(result, "asyncFn return value");
       });
 
-      context("when the function rejects", () => {
+      describe("when the function rejects", () => {
         const thrownError = new Error("Error from asyncFnWhichThrows");
 
         async function asyncFnWhichThrows() {
@@ -490,8 +458,8 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans).to.have.length(1);
-          expect(spans[0].ended).to.be.true;
+          assert.equal(spans.length, 1);
+          assert.equal(spans[0].ended, true);
         });
 
         it("should generate a span with an 'error' status code, and the message contained in the original error", async () => {
@@ -500,26 +468,22 @@ describe("Tracing instrumentation", () => {
           } catch { }
 
           const spans = await getSpans();
-          expect(spans[0]).to.deep.contain({
-            status: {
-              code: SpanStatusCode.ERROR,
-              message: "Error from asyncFnWhichThrows"
-            }
-          });
+          assert.equal(spans[0].status.code, SpanStatusCode.ERROR);
+          assert.equal(spans[0].status.message, "Error from asyncFnWhichThrows");
         });
 
         it("should reject with the error originally thrown by the function being traced", async () => {
           try {
             await trace(asyncFnWhichThrows);
-            expect.fail("Expected an error to be thrown");
+            assert.fail("Expected an error to be thrown");
           } catch (error){
-            expect(error).to.equal(thrownError);
+            assert.equal(error, thrownError);
           }
         });
       });
     });
 
-    context("when multiple nested calls to trace() are made", () => {
+    describe("when multiple nested calls to trace() are made", () => {
       it("should correctly nest spans", async () => {
         trace("first trace", () => {
           trace("second trace", () => {});
@@ -527,18 +491,18 @@ describe("Tracing instrumentation", () => {
         });
 
         const spans = await getSpans();
-        expect(spans).to.have.length(3);
+        assert.equal(spans.length, 3);
 
         const firstSpan = spans.find(span => span.name === "first trace")!;
         const secondSpan = spans.find(span => span.name === "second trace")!;
         const thirdSpan = spans.find(span => span.name === "third trace")!;
-        expect(firstSpan.parentSpanContext).to.be.undefined;
-        expect(secondSpan.parentSpanContext?.spanId).to.equal(firstSpan.spanContext().spanId);
-        expect(thirdSpan.parentSpanContext?.spanId).to.equal(firstSpan.spanContext().spanId);
+        assert.equal(firstSpan.parentSpanContext, undefined);
+        assert.equal(secondSpan.parentSpanContext?.spanId, firstSpan.spanContext().spanId);
+        assert.equal(thirdSpan.parentSpanContext?.spanId, firstSpan.spanContext().spanId);
       });
     });
 
-    context("when the 'inheritAttributesFromParentTrace' flag is used", () => {
+    describe("when the 'inheritAttributesFromParentTrace' flag is used", () => {
       it("should copy attributes from the parent span to the child span", async () => {
         const parentSpanAttributes = {
           [ATTR_ARTIFACT_VERSION]: "1.0"
@@ -550,7 +514,7 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        expect(secondSpan.attributes).to.deep.contain(parentSpanAttributes);
+        assert.equal(secondSpan.attributes[ATTR_ARTIFACT_VERSION], parentSpanAttributes[ATTR_ARTIFACT_VERSION]);
       });
 
       it("should not fail when the parent span does not have an 'attributes' property (which can occur when the parent span is non-recording)", async () => {
@@ -562,7 +526,7 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        expect(secondSpan.attributes).to.deep.equal({});
+        assert.deepEqual(secondSpan.attributes, {});
       });
 
       it("should copy links from the parent span to the child span", async () => {
@@ -581,7 +545,7 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        expect(secondSpan.links).to.deep.equal(parentSpanLinks);
+        assert.deepEqual(secondSpan.links, parentSpanLinks);
       });
 
       it("should not fail when the parent span does not have a 'links' property (which can occur when the parent span is non-recording)", async () => {
@@ -593,7 +557,7 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        expect(secondSpan.links).to.deep.equal([]);
+        assert.deepEqual(secondSpan.links, []);
       });
 
       it("should copy the 'kind' property from the parent span to the child span", async () => {
@@ -605,7 +569,7 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        expect(secondSpan.kind).to.equal(parentSpanKind);
+        assert.equal(secondSpan.kind, parentSpanKind);
       });
 
       it("should not fail when the parent span does not have a 'kind' property", async () => {
@@ -617,25 +581,26 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        expect(secondSpan.kind).to.equal(SpanKind.INTERNAL);
+        assert.equal(secondSpan.kind, SpanKind.INTERNAL);
       });
 
       it("should not copy any attributes or links when the span has no parent", async () => {
         trace("only trace", {inheritAttributesFromParentTrace: true}, () => {});
 
         const spans = await getSpans();
-        expect(spans).to.have.length(1);
-        expect(_.omit(spans[0].attributes, ATTR_CODE_FUNCTION_NAME)).to.eql({});
-        expect(spans[0].links).to.eql([]);
-        expect(spans[0].kind).to.eql(SpanKind.INTERNAL);
+        assert.equal(spans.length, 1);
+        const {[ATTR_CODE_FUNCTION_NAME]: _ignoredFunctionName, ...attributesWithoutFunctionName} = spans[0].attributes;
+        assert.deepEqual(attributesWithoutFunctionName, {});
+        assert.deepEqual(spans[0].links, []);
+        assert.equal(spans[0].kind, SpanKind.INTERNAL);
       });
 
       it("should set the 'kind' property to 'INTERNAL' when the span has no parent", async () => {
         trace("only trace", {inheritAttributesFromParentTrace: true}, () => {});
 
         const spans = await getSpans();
-        expect(spans).to.have.length(1);
-        expect(spans[0].kind).to.eql(SpanKind.INTERNAL);
+        assert.equal(spans.length, 1);
+        assert.equal(spans[0].kind, SpanKind.INTERNAL);
       });
     });
   });
@@ -650,13 +615,13 @@ describe("Tracing instrumentation", () => {
 
       const tracedFn = withTracing(originalFn);
 
-      expect(originalFnWasCalled).to.be.false;
+      assert.equal(originalFnWasCalled, false);
       tracedFn();
-      expect(originalFnWasCalled).to.be.true;
+      assert.equal(originalFnWasCalled, true);
 
       const spans = await getSpans();
-      expect(spans).to.have.length(1);
-      expect(spans[0].ended).to.be.true;
+      assert.equal(spans.length, 1);
+      assert.equal(spans[0].ended, true);
     });
 
     it("should return a function which has the same argument length as the original function", () => {
@@ -664,9 +629,9 @@ describe("Tracing instrumentation", () => {
         return arg1 + arg2 + arg3;
       }
 
-      expect(originalFn.length).to.equal(3);
+      assert.equal(originalFn.length, 3);
       const tracedFn = withTracing(originalFn);
-      expect(tracedFn.length).to.equal(originalFn.length);
+      assert.equal(tracedFn.length, originalFn.length);
     });
 
     it("should allow the traced function to maintain the same 'this' binding as the original function via an explicit call to .bind(...)", () => {
@@ -684,18 +649,18 @@ describe("Tracing instrumentation", () => {
 
       const someInstance = new SomeClass();
 
-      expect(someInstance.originalFn()).to.equal(someInstance.someProperty);
+      assert.equal(someInstance.originalFn(), someInstance.someProperty);
       const tracedFn = withTracing(someInstance.originalFn.bind(someInstance));
-      expect(tracedFn()).to.equal(someInstance.someProperty);
+      assert.equal(tracedFn(), someInstance.someProperty);
     });
 
     it("should return a function which has the same name as the original function", () => {
       function originalFn() {
       }
 
-      expect(originalFn.name).to.equal("originalFn");
+      assert.equal(originalFn.name, "originalFn");
       const tracedFn = withTracing(originalFn);
-      expect(tracedFn.name).to.equal("originalFn");
+      assert.equal(tracedFn.name, "originalFn");
     });
 
     it("should generate a span which is named after the function that is being traced", async () => {
@@ -706,7 +671,7 @@ describe("Tracing instrumentation", () => {
       tracedFn();
 
       const spans = await getSpans();
-      expect(spans[0].name).to.equal("originalFn");
+      assert.equal(spans[0].name, "originalFn");
     });
 
     it("should omit the word 'bound' from the function name when the function being traced has been explicitly bound", async () => {
@@ -717,7 +682,7 @@ describe("Tracing instrumentation", () => {
       tracedFn();
 
       const spans = await getSpans();
-      expect(spans[0].name).to.equal("originalFn");
+      assert.equal(spans[0].name, "originalFn");
     });
 
     it("should allow the user to provide a custom name for the span", async () => {
@@ -728,7 +693,7 @@ describe("Tracing instrumentation", () => {
       tracedFn();
 
       const spans = await getSpans();
-      expect(spans[0].name).to.equal("my-span-name");
+      assert.equal(spans[0].name, "my-span-name");
     });
 
     it("should allow the user to provide options which affect the properties of the span", async () => {
@@ -739,7 +704,7 @@ describe("Tracing instrumentation", () => {
       tracedFn();
 
       const spans = await getSpans();
-      expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+      assert.equal(spans[0].kind, SpanKind.PRODUCER);
     });
 
     it("should allow the user to provide both a span name as well as options which affect the properties of the span", async () => {
@@ -750,11 +715,11 @@ describe("Tracing instrumentation", () => {
       tracedFn();
 
       const spans = await getSpans();
-      expect(spans[0].name).to.equal("my-span-name");
-      expect(spans[0].kind).to.equal(SpanKind.PRODUCER);
+      assert.equal(spans[0].name, "my-span-name");
+      assert.equal(spans[0].kind, SpanKind.PRODUCER);
     });
 
-    context("when the function being traced is anonymous", () => {
+    describe("when the function being traced is anonymous", () => {
       it("should generate a span with the name of the calling function", async () => {
         let tracedFn;
 
@@ -766,7 +731,7 @@ describe("Tracing instrumentation", () => {
         tracedFn!();
 
         const spans = await getSpans();
-        expect(spans[0].name).to.equal("callingFunction");
+        assert.equal(spans[0].name, "callingFunction");
       });
 
       it("should give the span the name 'unnamed trace' when the calling function is an anonymous function expression", async () => {
@@ -778,26 +743,26 @@ describe("Tracing instrumentation", () => {
 
         tracedFn!();
         const spans = await getSpans();
-        expect(spans[0].name).to.be.equal("unnamed trace");
+        assert.equal(spans[0].name, "unnamed trace");
       });
     });
   });
 
   describe("getActiveSpan()", () => {
     it("should return the active span", async () => {
-      let activeSpan;
+      let activeSpan: ReturnType<typeof getActiveSpan>;
 
       trace("some-span-name", () => {
         activeSpan = getActiveSpan();
       });
 
-      expect(activeSpan).to.exist;
-      expect(activeSpan!.name).to.equal("some-span-name");
+      assert.ok(activeSpan);
+      assert.equal((activeSpan as any).name, "some-span-name");
     });
 
     it("should return undefined if there is no active span", async () => {
       const activeSpan = getActiveSpan();
-      expect(activeSpan).to.be.undefined;
+      assert.equal(activeSpan, undefined);
     });
   });
 
@@ -806,7 +771,8 @@ describe("Tracing instrumentation", () => {
       setAttributeOnSpan(undefined, monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953ef");
 
       const spans = await getSpans();
-      expect(spans).to.be.an("array").with.length(0);
+      assert.ok(Array.isArray(spans));
+      assert.equal(spans.length, 0);
     });
 
     it("should set the value of the requested attribute on the provided span", async () => {
@@ -816,8 +782,9 @@ describe("Tracing instrumentation", () => {
       });
 
       const spans = await getSpans();
-      expect(spans).to.be.an("array").with.length(1);
-      expect(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID]).to.eql("66d8a8e0530153052b3953ea");
+      assert.ok(Array.isArray(spans));
+      assert.equal(spans.length, 1);
+      assert.equal(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID], "66d8a8e0530153052b3953ea");
     });
   });
 
@@ -826,7 +793,8 @@ describe("Tracing instrumentation", () => {
       setAttributeOnActiveSpan(monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, "66d8a8e0530153052b3953e1");
 
       const spans = await getSpans();
-      expect(spans).to.be.an("array").with.length(0);
+      assert.ok(Array.isArray(spans));
+      assert.equal(spans.length, 0);
     });
 
     it("should set the value of the requested attribute on the active span", async () => {
@@ -835,8 +803,9 @@ describe("Tracing instrumentation", () => {
       });
 
       const spans = await getSpans();
-      expect(spans).to.be.an("array").with.length(1);
-      expect(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID]).to.eql("66d8a8e0530153052b3953e2");
+      assert.ok(Array.isArray(spans));
+      assert.equal(spans.length, 1);
+      assert.equal(spans[0].attributes[monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID], "66d8a8e0530153052b3953e2");
     });
   });
 });

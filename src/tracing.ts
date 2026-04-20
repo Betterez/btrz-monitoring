@@ -6,7 +6,7 @@ import process from "node:process";
 import * as util from "node:util";
 
 import chalk from "chalk";
-import {escapeRegExp} from "lodash";
+import escapeStringRegexp from "escape-string-regexp";
 
 import {NodeSDK} from "@opentelemetry/sdk-node";
 import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-node";
@@ -216,9 +216,9 @@ function getRegularExpressionsMatchingAllContentsOfDirectory(directory: string):
     const stats = fs.lstatSync(pathToEntry);
 
     if (stats.isDirectory()) {
-      return new RegExp(`^\/${escapeRegExp(entry)}\/`);
+      return new RegExp(`^\/${escapeStringRegexp(entry)}\/`);
     } else if (stats.isFile()) {
-      return new RegExp(`^\/${escapeRegExp(entry)}$`);
+      return new RegExp(`^\/${escapeStringRegexp(entry)}$`);
     } else {
       return undefined;
     }

@@ -450,6 +450,7 @@ export declare const monitoringAttributes: {
     readonly ATTR_ASPNETCORE_ROUTING_MATCH_STATUS: "aspnetcore.routing.match_status";
     readonly ASPNETCORE_ROUTING_MATCH_STATUS_VALUE_FAILURE: "failure";
     readonly ASPNETCORE_ROUTING_MATCH_STATUS_VALUE_SUCCESS: "success";
+    readonly ATTR_ASPNETCORE_USER_IS_AUTHENTICATED: "aspnetcore.user.is_authenticated";
     readonly ATTR_CLIENT_ADDRESS: "client.address";
     readonly ATTR_CLIENT_PORT: "client.port";
     readonly ATTR_CODE_COLUMN_NUMBER: "code.column.number";
@@ -536,7 +537,9 @@ export declare const monitoringAttributes: {
     readonly ATTR_OTEL_STATUS_DESCRIPTION: "otel.status_description";
     readonly ATTR_SERVER_ADDRESS: "server.address";
     readonly ATTR_SERVER_PORT: "server.port";
+    readonly ATTR_SERVICE_INSTANCE_ID: "service.instance.id";
     readonly ATTR_SERVICE_NAME: "service.name";
+    readonly ATTR_SERVICE_NAMESPACE: "service.namespace";
     readonly ATTR_SERVICE_VERSION: "service.version";
     readonly ATTR_SIGNALR_CONNECTION_STATUS: "signalr.connection.status";
     readonly SIGNALR_CONNECTION_STATUS_VALUE_APP_SHUTDOWN: "app_shutdown";
@@ -618,6 +621,7 @@ export declare const monitoringAttributes: {
     readonly METRIC_KESTREL_UPGRADED_CONNECTIONS: "kestrel.upgraded_connections";
     readonly METRIC_SIGNALR_SERVER_ACTIVE_CONNECTIONS: "signalr.server.active_connections";
     readonly METRIC_SIGNALR_SERVER_CONNECTION_DURATION: "signalr.server.connection.duration";
+    readonly EVENT_EXCEPTION: "exception";
     readonly ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id";
     readonly ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id";
 };

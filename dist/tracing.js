@@ -52,7 +52,7 @@ const path = __importStar(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
 const util = __importStar(require("node:util"));
 const chalk_1 = __importDefault(require("chalk"));
-const lodash_1 = require("lodash");
+const escape_string_regexp_1 = __importDefault(require("escape-string-regexp"));
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
 const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
@@ -186,10 +186,10 @@ function getRegularExpressionsMatchingAllContentsOfDirectory(directory) {
         const pathToEntry = path.join(directory, entry);
         const stats = fs.lstatSync(pathToEntry);
         if (stats.isDirectory()) {
-            return new RegExp(`^\/${(0, lodash_1.escapeRegExp)(entry)}\/`);
+            return new RegExp(`^\/${(0, escape_string_regexp_1.default)(entry)}\/`);
         }
         else if (stats.isFile()) {
-            return new RegExp(`^\/${(0, lodash_1.escapeRegExp)(entry)}$`);
+            return new RegExp(`^\/${(0, escape_string_regexp_1.default)(entry)}$`);
         }
         else {
             return undefined;

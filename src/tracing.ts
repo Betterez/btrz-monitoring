@@ -39,7 +39,6 @@ import {
 } from "@opentelemetry/api";
 import {
   AwsSdkRequestHookInformation,
-  AwsSdkSqsProcessHookInformation
 } from "@opentelemetry/instrumentation-aws-sdk";
 
 import {BtrzLogger, SimpleDao} from "./types/external.types";
@@ -151,12 +150,9 @@ export function initializeTracing(options: TracingInitOptions) {
       "@opentelemetry/instrumentation-aws-sdk": {
         suppressInternalInstrumentation: true,
         preRequestHook(span: Span, request: AwsSdkRequestHookInformation) {
+          // Newer versions of @opentelemetry/instrumentation-aws-sdk no longer provide a
+          // dedicated sqsProcessHook. We can still suppress request-based SQS events here.
           if ((ignoredAwsSqsEvents as string[]).includes(request.request.commandName)) {
-            span.spanContext().traceFlags = TraceFlags.NONE;
-          }
-        },
-        sqsProcessHook(span: Span, sqsProcessInfo: AwsSdkSqsProcessHookInformation) {
-          if (ignoredAwsSqsEvents.includes("ProcessMessage")) {
             span.spanContext().traceFlags = TraceFlags.NONE;
           }
         }

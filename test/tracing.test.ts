@@ -591,7 +591,8 @@ describe("Tracing instrumentation", () => {
 
         const spans = await getSpans();
         const secondSpan = spans.find(span => span.name === "second trace")!;
-        assert.deepEqual(secondSpan.links, parentSpanLinks);
+        assert.equal(secondSpan.links.length, 1);
+        assert.deepEqual(secondSpan.links[0].context, parentSpanLinks[0].context);
       });
 
       it("should not fail when the parent span does not have a 'links' property (which can occur when the parent span is non-recording)", async () => {

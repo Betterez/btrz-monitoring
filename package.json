@@ -20,18 +20,16 @@
   "author": "Betterez Inc.",
   "license": "ISC",
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.60.0",
-    "@opentelemetry/core": "^2.0.1",
-    "@opentelemetry/exporter-trace-otlp-grpc": "^0.202.0",
-    "@opentelemetry/sdk-node": "^0.202.0",
-    "@opentelemetry/semantic-conventions": "^1.34.0",
-    "chalk": "^4.1.2",
-    "escape-string-regexp": "^4.0.0"
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "0.77.0",
+    "@opentelemetry/core": "2.8.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.219.0",
+    "@opentelemetry/sdk-node": "0.219.0",
+    "@opentelemetry/semantic-conventions": "1.41.1"
   },
   "devDependencies": {
     "@types/sinon": "21.0.1",
-    "sinon": "21.1.2",
+    "sinon": "22.0.0",
     "ts-node": "10.9.2",
     "typescript": "5.8.3"
   }

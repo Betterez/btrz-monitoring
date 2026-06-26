@@ -1,6 +1,9 @@
 import "../src/types/global.types";
 
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import util from "node:util";
 import {afterEach, before, beforeEach, describe, it} from "node:test";
 import * as sinon from "sinon";
 import {
@@ -50,6 +53,14 @@ describe("Tracing instrumentation", () => {
   }
 
   describe("initializeTracing()", () => {
+    it("should not require chalk as a runtime dependency", () => {
+      const packageJsonPath = path.resolve(__dirname, "../package.json");
+      const packageJsonContents = fs.readFileSync(packageJsonPath, "utf8");
+      const packageJson = JSON.parse(packageJsonContents) as {dependencies?: Record<string, string>};
+
+      assert.equal(packageJson.dependencies?.chalk, undefined);
+    });
+
     it("should return a shutdownTracing() function which gracefully shuts down the tracing instrumentation", async () => {
       const {shutdownTracing} = initializeTracing({
         serviceName: "btrz-monitoring-tests",
@@ -76,6 +87,41 @@ describe("Tracing instrumentation", () => {
 
       await shutdownTracing();
       // If no rejection occurred, the test has passed.
+    });
+
+    it("should log plain shutdown status messages", async () => {
+      const {shutdownTracing} = initializeTracing({
+        serviceName: "btrz-monitoring-tests",
+        traceDestinationUrl: "http://localhost:4317"
+      });
+
+      const sdk = __getActiveOtlpSdkInstance()!;
+      sinon.stub(sdk, "shutdown").resolves();
+      const logStub = sinon.stub(console, "log");
+
+      await shutdownTracing();
+
+      assert.equal(logStub.callCount, 2);
+      assert.equal(logStub.firstCall.args[0], "[btrz-monitoring] Stopping tracing...");
+      assert.equal(logStub.secondCall.args[0], "[btrz-monitoring] Tracing stopped");
+    });
+
+    it("should log plain error details if tracing shutdown fails", async () => {
+      const {shutdownTracing} = initializeTracing({
+        serviceName: "btrz-monitoring-tests",
+        traceDestinationUrl: "http://localhost:4317"
+      });
+
+      const shutdownError = new Error("Some error");
+      const sdk = __getActiveOtlpSdkInstance()!;
+      sinon.stub(sdk, "shutdown").rejects(shutdownError);
+      const errorStub = sinon.stub(console, "error");
+
+      await shutdownTracing();
+
+      assert.equal(errorStub.callCount, 2);
+      assert.equal(errorStub.firstCall.args[0], "[btrz-monitoring] Error while stopping tracing");
+      assert.equal(errorStub.secondCall.args[0], util.inspect(shutdownError));
     });
   });
 

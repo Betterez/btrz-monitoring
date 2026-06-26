@@ -5,8 +5,7 @@ import * as path from "node:path";
 import process from "node:process";
 import * as util from "node:util";
 
-import chalk from "chalk";
-import escapeStringRegexp from "escape-string-regexp";
+import {escapeStringRegexp} from "./escape-string-regexp";
 
 import {NodeSDK} from "@opentelemetry/sdk-node";
 import {getNodeAutoInstrumentations} from "@opentelemetry/auto-instrumentations-node";
@@ -253,12 +252,12 @@ function forcefullyEnableFilesystemTracing() {
 function shutdownTracing(sdk: NodeSDK) {
   return async () => {
     try {
-      console.log(chalk.yellow("[btrz-monitoring] Stopping tracing..."));
+      console.log("[btrz-monitoring] Stopping tracing...");
       await sdk.shutdown();
-      console.log(chalk.yellow("[btrz-monitoring] Tracing stopped"));
+      console.log("[btrz-monitoring] Tracing stopped");
     } catch (error) {
-      console.error(chalk.red("[btrz-monitoring] Error while stopping tracing"));
-      console.error(chalk.red(util.inspect(error)));
+      console.error("[btrz-monitoring] Error while stopping tracing");
+      console.error(util.inspect(error));
     } finally {
       __activeOtlpSdkInstance = null;
     }

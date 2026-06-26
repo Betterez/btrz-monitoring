@@ -51,8 +51,7 @@ const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
 const util = __importStar(require("node:util"));
-const chalk_1 = __importDefault(require("chalk"));
-const escape_string_regexp_1 = __importDefault(require("escape-string-regexp"));
+const escape_string_regexp_1 = require("./escape-string-regexp");
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
 const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
@@ -127,12 +126,9 @@ function initializeTracing(options) {
                 "@opentelemetry/instrumentation-aws-sdk": {
                     suppressInternalInstrumentation: true,
                     preRequestHook(span, request) {
+                        // Newer versions of @opentelemetry/instrumentation-aws-sdk no longer provide a
+                        // dedicated sqsProcessHook. We can still suppress request-based SQS events here.
                         if (ignoredAwsSqsEvents.includes(request.request.commandName)) {
-                            span.spanContext().traceFlags = api_1.TraceFlags.NONE;
-                        }
-                    },
-                    sqsProcessHook(span, sqsProcessInfo) {
-                        if (ignoredAwsSqsEvents.includes("ProcessMessage")) {
                             span.spanContext().traceFlags = api_1.TraceFlags.NONE;
                         }
                     }
@@ -186,10 +182,10 @@ function getRegularExpressionsMatchingAllContentsOfDirectory(directory) {
         const pathToEntry = path.join(directory, entry);
         const stats = fs.lstatSync(pathToEntry);
         if (stats.isDirectory()) {
-            return new RegExp(`^\/${(0, escape_string_regexp_1.default)(entry)}\/`);
+            return new RegExp(`^\/${(0, escape_string_regexp_1.escapeStringRegexp)(entry)}\/`);
         }
         else if (stats.isFile()) {
-            return new RegExp(`^\/${(0, escape_string_regexp_1.default)(entry)}$`);
+            return new RegExp(`^\/${(0, escape_string_regexp_1.escapeStringRegexp)(entry)}$`);
         }
         else {
             return undefined;
@@ -222,13 +218,13 @@ function forcefullyEnableFilesystemTracing() {
 function shutdownTracing(sdk) {
     return async () => {
         try {
-            console.log(chalk_1.default.yellow("[btrz-monitoring] Stopping tracing..."));
+            console.log("[btrz-monitoring] Stopping tracing...");
             await sdk.shutdown();
-            console.log(chalk_1.default.yellow("[btrz-monitoring] Tracing stopped"));
+            console.log("[btrz-monitoring] Tracing stopped");
         }
         catch (error) {
-            console.error(chalk_1.default.red("[btrz-monitoring] Error while stopping tracing"));
-            console.error(chalk_1.default.red(util.inspect(error)));
+            console.error("[btrz-monitoring] Error while stopping tracing");
+            console.error(util.inspect(error));
         }
         finally {
             __activeOtlpSdkInstance = null;

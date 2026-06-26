@@ -471,6 +471,11 @@ export declare const monitoringAttributes: {
     readonly DB_SYSTEM_NAME_VALUE_MICROSOFT_SQL_SERVER: "microsoft.sql_server";
     readonly DB_SYSTEM_NAME_VALUE_MYSQL: "mysql";
     readonly DB_SYSTEM_NAME_VALUE_POSTGRESQL: "postgresql";
+    readonly ATTR_DEPLOYMENT_ENVIRONMENT_NAME: "deployment.environment.name";
+    readonly DEPLOYMENT_ENVIRONMENT_NAME_VALUE_DEVELOPMENT: "development";
+    readonly DEPLOYMENT_ENVIRONMENT_NAME_VALUE_PRODUCTION: "production";
+    readonly DEPLOYMENT_ENVIRONMENT_NAME_VALUE_STAGING: "staging";
+    readonly DEPLOYMENT_ENVIRONMENT_NAME_VALUE_TEST: "test";
     readonly ATTR_DOTNET_GC_HEAP_GENERATION: "dotnet.gc.heap.generation";
     readonly DOTNET_GC_HEAP_GENERATION_VALUE_GEN0: "gen0";
     readonly DOTNET_GC_HEAP_GENERATION_VALUE_GEN1: "gen1";
@@ -529,6 +534,7 @@ export declare const monitoringAttributes: {
     readonly ATTR_NETWORK_TYPE: "network.type";
     readonly NETWORK_TYPE_VALUE_IPV4: "ipv4";
     readonly NETWORK_TYPE_VALUE_IPV6: "ipv6";
+    readonly ATTR_OTEL_EVENT_NAME: "otel.event.name";
     readonly ATTR_OTEL_SCOPE_NAME: "otel.scope.name";
     readonly ATTR_OTEL_SCOPE_VERSION: "otel.scope.version";
     readonly ATTR_OTEL_STATUS_CODE: "otel.status_code";
@@ -549,6 +555,8 @@ export declare const monitoringAttributes: {
     readonly SIGNALR_TRANSPORT_VALUE_LONG_POLLING: "long_polling";
     readonly SIGNALR_TRANSPORT_VALUE_SERVER_SENT_EVENTS: "server_sent_events";
     readonly SIGNALR_TRANSPORT_VALUE_WEB_SOCKETS: "web_sockets";
+    readonly ATTR_TELEMETRY_DISTRO_NAME: "telemetry.distro.name";
+    readonly ATTR_TELEMETRY_DISTRO_VERSION: "telemetry.distro.version";
     readonly ATTR_TELEMETRY_SDK_LANGUAGE: "telemetry.sdk.language";
     readonly TELEMETRY_SDK_LANGUAGE_VALUE_CPP: "cpp";
     readonly TELEMETRY_SDK_LANGUAGE_VALUE_DOTNET: "dotnet";

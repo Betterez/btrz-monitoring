@@ -4,8 +4,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import util from "node:util";
-import {afterEach, before, beforeEach, describe, it} from "node:test";
-import * as sinon from "sinon";
+import {afterEach, before, beforeEach, describe, it, mock} from "node:test";
 import {
   __enableTestMode,
   __getActiveOtlpSdkInstance,
@@ -44,7 +43,7 @@ describe("Tracing instrumentation", () => {
 
   afterEach(() => {
     spanExporter.reset();
-    sinon.restore();
+    mock.restoreAll();
   });
 
   async function getSpans() {
@@ -70,10 +69,10 @@ describe("Tracing instrumentation", () => {
       assert.equal(typeof shutdownTracing, "function");
 
       const sdk = __getActiveOtlpSdkInstance()!;
-      const sdkShutdownStub = sinon.stub(sdk, "shutdown").resolves();
+      const sdkShutdownStub = mock.method(sdk, "shutdown", async () => undefined);
 
       await shutdownTracing();
-      assert.equal(sdkShutdownStub.calledOnce, true);
+      assert.equal(sdkShutdownStub.mock.callCount(), 1);
     });
 
     it("should return a shutdownTracing() function that swallows any errors which occur when shutting down the tracing instrumentation", async () => {
@@ -83,7 +82,9 @@ describe("Tracing instrumentation", () => {
       });
 
       const sdk = __getActiveOtlpSdkInstance()!;
-      sinon.stub(sdk, "shutdown").rejects(new Error("Some error"));
+      mock.method(sdk, "shutdown", async () => {
+        throw new Error("Some error");
+      });
 
       await shutdownTracing();
       // If no rejection occurred, the test has passed.
@@ -96,14 +97,14 @@ describe("Tracing instrumentation", () => {
       });
 
       const sdk = __getActiveOtlpSdkInstance()!;
-      sinon.stub(sdk, "shutdown").resolves();
-      const logStub = sinon.stub(console, "log");
+      mock.method(sdk, "shutdown", async () => undefined);
+      const logStub = mock.method(console, "log", () => undefined);
 
       await shutdownTracing();
 
-      assert.equal(logStub.callCount, 2);
-      assert.equal(logStub.firstCall.args[0], "[btrz-monitoring] Stopping tracing...");
-      assert.equal(logStub.secondCall.args[0], "[btrz-monitoring] Tracing stopped");
+      assert.equal(logStub.mock.callCount(), 2);
+      assert.equal(logStub.mock.calls[0].arguments[0], "[btrz-monitoring] Stopping tracing...");
+      assert.equal(logStub.mock.calls[1].arguments[0], "[btrz-monitoring] Tracing stopped");
     });
 
     it("should log plain error details if tracing shutdown fails", async () => {
@@ -114,14 +115,16 @@ describe("Tracing instrumentation", () => {
 
       const shutdownError = new Error("Some error");
       const sdk = __getActiveOtlpSdkInstance()!;
-      sinon.stub(sdk, "shutdown").rejects(shutdownError);
-      const errorStub = sinon.stub(console, "error");
+      mock.method(sdk, "shutdown", async () => {
+        throw shutdownError;
+      });
+      const errorStub = mock.method(console, "error", () => undefined);
 
       await shutdownTracing();
 
-      assert.equal(errorStub.callCount, 2);
-      assert.equal(errorStub.firstCall.args[0], "[btrz-monitoring] Error while stopping tracing");
-      assert.equal(errorStub.secondCall.args[0], util.inspect(shutdownError));
+      assert.equal(errorStub.mock.callCount(), 2);
+      assert.equal(errorStub.mock.calls[0].arguments[0], "[btrz-monitoring] Error while stopping tracing");
+      assert.equal(errorStub.mock.calls[1].arguments[0], util.inspect(shutdownError));
     });
   });
 

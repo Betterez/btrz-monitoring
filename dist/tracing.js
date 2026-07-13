@@ -61,6 +61,7 @@ const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
 const id_generator_aws_xray_1 = require("@opentelemetry/id-generator-aws-xray");
+const propagator_aws_xray_1 = require("@opentelemetry/propagator-aws-xray");
 var TraceCompatibilityMode;
 (function (TraceCompatibilityMode) {
     TraceCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
@@ -105,6 +106,8 @@ function initializeTracing(options) {
             maxExportBatchSize: 4096,
             maxQueueSize: 8192
         });
+    const propagator = traceCompatibility === TraceCompatibilityMode.CLOUDWATCH ?
+        new propagator_aws_xray_1.AWSXRayPropagator() : undefined;
     const sdk = new sdk_node_1.NodeSDK({
         resource: (0, resources_1.resourceFromAttributes)({
             [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
@@ -112,6 +115,7 @@ function initializeTracing(options) {
         spanProcessors: [spanProcessor],
         sampler: samplePercentage === 100 ? new sdk_trace_base_1.AlwaysOnSampler() : new sdk_trace_base_1.TraceIdRatioBasedSampler(samplePercentage / 100),
         idGenerator: traceIdGenerator,
+        textMapPropagator: propagator,
         instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({
                 "@opentelemetry/instrumentation-fs": {
                     enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().

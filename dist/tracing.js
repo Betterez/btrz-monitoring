@@ -60,6 +60,11 @@ const semanticConventions = __importStar(require("@opentelemetry/semantic-conven
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
+const id_generator_aws_xray_1 = require("@opentelemetry/id-generator-aws-xray");
+var TraceCompatibilityMode;
+(function (TraceCompatibilityMode) {
+    TraceCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
+})(TraceCompatibilityMode || (TraceCompatibilityMode = {}));
 exports.monitoringAttributes = {
     ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
     ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id",
@@ -69,7 +74,7 @@ let __activeOtlpSdkInstance = null;
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
+    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, traceCompatibility, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return {
@@ -93,6 +98,8 @@ function initializeTracing(options) {
         new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
             url: traceDestinationUrl
         });
+    const traceIdGenerator = traceCompatibility === TraceCompatibilityMode.CLOUDWATCH ?
+        new id_generator_aws_xray_1.AWSXRayIdGenerator() : undefined;
     const spanProcessor = global.__btrz_monitoring__spanProcessorForTests ||
         new sdk_trace_base_1.BatchSpanProcessor(traceExporter, {
             maxExportBatchSize: 4096,
@@ -104,6 +111,7 @@ function initializeTracing(options) {
         }),
         spanProcessors: [spanProcessor],
         sampler: samplePercentage === 100 ? new sdk_trace_base_1.AlwaysOnSampler() : new sdk_trace_base_1.TraceIdRatioBasedSampler(samplePercentage / 100),
+        idGenerator: traceIdGenerator,
         instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({
                 "@opentelemetry/instrumentation-fs": {
                     enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().

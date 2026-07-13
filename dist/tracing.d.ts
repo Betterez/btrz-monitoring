@@ -8,11 +8,15 @@ interface TracingInitOptions {
     serviceName: string;
     samplePercentage?: number;
     traceDestinationUrl: string;
+    traceCompatibility?: TraceCompatibilityMode;
     ignoreStaticAssetDir?: string | string[];
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];
     ignoredAwsSqsEvents?: AwsSqsEvent[];
     enableFilesystemTracing?: boolean;
+}
+declare enum TraceCompatibilityMode {
+    CLOUDWATCH = "cloudwatch"
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
 type HttpRoute = {

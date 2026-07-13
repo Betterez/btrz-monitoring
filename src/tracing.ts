@@ -40,7 +40,8 @@ import {
 import {
   AwsSdkRequestHookInformation,
 } from "@opentelemetry/instrumentation-aws-sdk";
-import {AWSXRayIdGenerator} from "@opentelemetry/id-generator-aws-xray"
+import {AWSXRayIdGenerator} from "@opentelemetry/id-generator-aws-xray";
+import {AWSXRayPropagator} from "@opentelemetry/propagator-aws-xray";
 
 import {BtrzLogger, SimpleDao} from "./types/external.types";
 
@@ -133,6 +134,9 @@ export function initializeTracing(options: TracingInitOptions) {
       maxQueueSize: 8192
     });
 
+  const propagator = traceCompatibility === TraceCompatibilityMode.CLOUDWATCH ?
+    new AWSXRayPropagator() : undefined;
+
   const sdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName
@@ -140,6 +144,7 @@ export function initializeTracing(options: TracingInitOptions) {
     spanProcessors: [spanProcessor],
     sampler: samplePercentage === 100 ? new AlwaysOnSampler() : new TraceIdRatioBasedSampler(samplePercentage / 100),
     idGenerator: traceIdGenerator,
+    textMapPropagator: propagator,
     instrumentations: [getNodeAutoInstrumentations({
       "@opentelemetry/instrumentation-fs": {
         enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().

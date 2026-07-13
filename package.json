@@ -25,6 +25,7 @@
     "@opentelemetry/auto-instrumentations-node": "0.77.0",
     "@opentelemetry/core": "2.8.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "0.219.0",
+    "@opentelemetry/id-generator-aws-xray": "2.1.0",
     "@opentelemetry/sdk-node": "0.219.0",
     "@opentelemetry/semantic-conventions": "1.41.1"
   },

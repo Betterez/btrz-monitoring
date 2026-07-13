@@ -40,6 +40,7 @@ import {
 import {
   AwsSdkRequestHookInformation,
 } from "@opentelemetry/instrumentation-aws-sdk";
+import {AWSXRayIdGenerator} from "@opentelemetry/id-generator-aws-xray"
 
 import {BtrzLogger, SimpleDao} from "./types/external.types";
 
@@ -48,11 +49,16 @@ interface TracingInitOptions {
   serviceName: string;
   samplePercentage?: number;
   traceDestinationUrl: string;
+  traceCompatibility?: TraceCompatibilityMode;
   ignoreStaticAssetDir?: string | string[];
   ignoredHttpMethods?: HttpMethod[];
   ignoredRoutes?: HttpRoute[];
   ignoredAwsSqsEvents?: AwsSqsEvent[];
   enableFilesystemTracing?: boolean;
+}
+
+enum TraceCompatibilityMode {
+  CLOUDWATCH = "cloudwatch"
 }
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
@@ -82,6 +88,7 @@ export function initializeTracing(options: TracingInitOptions) {
     serviceName,
     samplePercentage = 100,
     traceDestinationUrl,
+    traceCompatibility,
     ignoreStaticAssetDir = [],
     ignoredHttpMethods = [],
     ignoredRoutes = [],
@@ -117,6 +124,8 @@ export function initializeTracing(options: TracingInitOptions) {
     new OTLPTraceExporter({
       url: traceDestinationUrl
     });
+  const traceIdGenerator = traceCompatibility === TraceCompatibilityMode.CLOUDWATCH ?
+    new AWSXRayIdGenerator() : undefined;
 
   const spanProcessor = global.__btrz_monitoring__spanProcessorForTests ||
     new BatchSpanProcessor(traceExporter, {
@@ -130,6 +139,7 @@ export function initializeTracing(options: TracingInitOptions) {
     }),
     spanProcessors: [spanProcessor],
     sampler: samplePercentage === 100 ? new AlwaysOnSampler() : new TraceIdRatioBasedSampler(samplePercentage / 100),
+    idGenerator: traceIdGenerator,
     instrumentations: [getNodeAutoInstrumentations({
       "@opentelemetry/instrumentation-fs": {
         enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().

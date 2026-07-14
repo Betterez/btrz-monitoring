@@ -51,6 +51,7 @@ const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
 const util = __importStar(require("node:util"));
+const ansi_colors_1 = __importDefault(require("ansi-colors"));
 const escape_string_regexp_1 = require("./escape-string-regexp");
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
@@ -236,13 +237,13 @@ function forcefullyEnableFilesystemTracing() {
 function shutdownTracing(sdk) {
     return async () => {
         try {
-            console.log("[btrz-monitoring] Stopping tracing...");
+            console.log(ansi_colors_1.default.yellow("[btrz-monitoring] Stopping tracing..."));
             await sdk.shutdown();
-            console.log("[btrz-monitoring] Tracing stopped");
+            console.log(ansi_colors_1.default.yellow("[btrz-monitoring] Tracing stopped"));
         }
         catch (error) {
-            console.error("[btrz-monitoring] Error while stopping tracing");
-            console.error(util.inspect(error));
+            console.error(ansi_colors_1.default.red("[btrz-monitoring] Error while stopping tracing"));
+            console.error(ansi_colors_1.default.red(util.inspect(error)));
         }
         finally {
             __activeOtlpSdkInstance = null;

@@ -62,6 +62,8 @@ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
 const id_generator_aws_xray_1 = require("@opentelemetry/id-generator-aws-xray");
 const propagator_aws_xray_1 = require("@opentelemetry/propagator-aws-xray");
+const resources_2 = require("@opentelemetry/resources");
+const resource_detector_aws_1 = require("@opentelemetry/resource-detector-aws");
 var TraceCompatibilityMode;
 (function (TraceCompatibilityMode) {
     TraceCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
@@ -95,6 +97,9 @@ function initializeTracing(options) {
     if (enableFilesystemTracing) {
         forcefullyEnableFilesystemTracing();
     }
+    // The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
+    // of resource detectors instead of using the defaults.
+    const resourceDetectors = [resources_2.envDetector, resources_2.processDetector, resources_2.hostDetector, resources_2.osDetector, resource_detector_aws_1.awsEc2Detector];
     const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
         new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
             url: traceDestinationUrl
@@ -112,6 +117,7 @@ function initializeTracing(options) {
         resource: (0, resources_1.resourceFromAttributes)({
             [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
         }),
+        resourceDetectors,
         spanProcessors: [spanProcessor],
         sampler: samplePercentage === 100 ? new sdk_trace_base_1.AlwaysOnSampler() : new sdk_trace_base_1.TraceIdRatioBasedSampler(samplePercentage / 100),
         idGenerator: traceIdGenerator,

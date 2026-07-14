@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import util from "node:util";
 import {afterEach, before, beforeEach, describe, it, mock} from "node:test";
+import color from "ansi-colors";
 import {
   __enableTestMode,
   __getActiveOtlpSdkInstance,
@@ -90,7 +91,7 @@ describe("Tracing instrumentation", () => {
       // If no rejection occurred, the test has passed.
     });
 
-    it("should log plain shutdown status messages", async () => {
+    it("should log shutdown status messages", async () => {
       const {shutdownTracing} = initializeTracing({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
@@ -103,11 +104,11 @@ describe("Tracing instrumentation", () => {
       await shutdownTracing();
 
       assert.equal(logStub.mock.callCount(), 2);
-      assert.equal(logStub.mock.calls[0].arguments[0], "[btrz-monitoring] Stopping tracing...");
-      assert.equal(logStub.mock.calls[1].arguments[0], "[btrz-monitoring] Tracing stopped");
+      assert.equal(logStub.mock.calls[0].arguments[0], color.yellow("[btrz-monitoring] Stopping tracing..."));
+      assert.equal(logStub.mock.calls[1].arguments[0], color.yellow("[btrz-monitoring] Tracing stopped"));
     });
 
-    it("should log plain error details if tracing shutdown fails", async () => {
+    it("should log error details if tracing shutdown fails", async () => {
       const {shutdownTracing} = initializeTracing({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
@@ -123,8 +124,8 @@ describe("Tracing instrumentation", () => {
       await shutdownTracing();
 
       assert.equal(errorStub.mock.callCount(), 2);
-      assert.equal(errorStub.mock.calls[0].arguments[0], "[btrz-monitoring] Error while stopping tracing");
-      assert.equal(errorStub.mock.calls[1].arguments[0], util.inspect(shutdownError));
+      assert.equal(errorStub.mock.calls[0].arguments[0], color.red("[btrz-monitoring] Error while stopping tracing"));
+      assert.equal(errorStub.mock.calls[1].arguments[0], color.red(util.inspect(shutdownError)));
     });
   });
 

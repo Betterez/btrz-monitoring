@@ -5,6 +5,7 @@ import * as path from "node:path";
 import process from "node:process";
 import * as util from "node:util";
 
+import color from "ansi-colors";
 import {escapeStringRegexp} from "./escape-string-regexp";
 
 import {NodeSDK} from "@opentelemetry/sdk-node";
@@ -270,12 +271,12 @@ function forcefullyEnableFilesystemTracing() {
 function shutdownTracing(sdk: NodeSDK) {
   return async () => {
     try {
-      console.log("[btrz-monitoring] Stopping tracing...");
+      console.log(color.yellow("[btrz-monitoring] Stopping tracing..."));
       await sdk.shutdown();
-      console.log("[btrz-monitoring] Tracing stopped");
+      console.log(color.yellow("[btrz-monitoring] Tracing stopped"));
     } catch (error) {
-      console.error("[btrz-monitoring] Error while stopping tracing");
-      console.error(util.inspect(error));
+      console.error(color.red("[btrz-monitoring] Error while stopping tracing"));
+      console.error(color.red(util.inspect(error)));
     } finally {
       __activeOtlpSdkInstance = null;
     }

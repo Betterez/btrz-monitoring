@@ -42,6 +42,8 @@ import {
 } from "@opentelemetry/instrumentation-aws-sdk";
 import {AWSXRayIdGenerator} from "@opentelemetry/id-generator-aws-xray";
 import {AWSXRayPropagator} from "@opentelemetry/propagator-aws-xray";
+import {envDetector, processDetector, hostDetector, osDetector} from "@opentelemetry/resources";
+import {awsEc2Detector} from "@opentelemetry/resource-detector-aws";
 
 import {BtrzLogger, SimpleDao} from "./types/external.types";
 
@@ -121,6 +123,10 @@ export function initializeTracing(options: TracingInitOptions) {
     forcefullyEnableFilesystemTracing();
   }
 
+  // The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
+  // of resource detectors instead of using the defaults.
+  const resourceDetectors = [envDetector, processDetector, hostDetector, osDetector, awsEc2Detector];
+
   const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
     new OTLPTraceExporter({
       url: traceDestinationUrl
@@ -141,6 +147,7 @@ export function initializeTracing(options: TracingInitOptions) {
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName
     }),
+    resourceDetectors,
     spanProcessors: [spanProcessor],
     sampler: samplePercentage === 100 ? new AlwaysOnSampler() : new TraceIdRatioBasedSampler(samplePercentage / 100),
     idGenerator: traceIdGenerator,

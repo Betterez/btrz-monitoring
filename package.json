@@ -25,8 +25,10 @@
     "@opentelemetry/core": "2.8.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "0.219.0",
     "@opentelemetry/id-generator-aws-xray": "2.1.0",
+    "@opentelemetry/propagator-aws-xray": "^2.2.0",
+    "@opentelemetry/resource-detector-aws": "^2.20.0",
     "@opentelemetry/sdk-node": "0.219.0",
-    "@opentelemetry/semantic-conventions": "1.41.1"
+    "@opentelemetry/semantic-conventions": "1.43.0"
   },
   "devDependencies": {
     "ts-node": "10.9.2",

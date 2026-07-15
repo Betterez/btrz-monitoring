@@ -56,6 +56,9 @@ const escape_string_regexp_1 = require("./escape-string-regexp");
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
 const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
+const exporter_metrics_otlp_grpc_1 = require("@opentelemetry/exporter-metrics-otlp-grpc");
+const exporter_metrics_otlp_http_1 = require("@opentelemetry/exporter-metrics-otlp-http");
+const sdk_metrics_1 = require("@opentelemetry/sdk-metrics");
 const resources_1 = require("@opentelemetry/resources");
 const semanticConventions = __importStar(require("@opentelemetry/semantic-conventions"));
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
@@ -65,21 +68,162 @@ const id_generator_aws_xray_1 = require("@opentelemetry/id-generator-aws-xray");
 const propagator_aws_xray_1 = require("@opentelemetry/propagator-aws-xray");
 const resources_2 = require("@opentelemetry/resources");
 const resource_detector_aws_1 = require("@opentelemetry/resource-detector-aws");
-var TraceCompatibilityMode;
-(function (TraceCompatibilityMode) {
-    TraceCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
-})(TraceCompatibilityMode || (TraceCompatibilityMode = {}));
+const DEFAULT_SAMPLE_PERCENTAGE = 100;
+// When exporting to CloudWatch, the metrics export interval must not exceed 60 seconds or metric/trace correlation
+// will not work correctly.
+const METRIC_EXPORT_INTERVAL_MILLIS = 60000;
+// CloudWatch Application Signals aggregates latency using an exponential histogram; all other instruments use the
+// default aggregation.  This should match the aggregation selector used by the
+// "@aws/aws-distro-opentelemetry-node-autoinstrumentation" package.
+const cloudWatchAggregationSelector = (instrumentType) => {
+    if (instrumentType === sdk_metrics_1.InstrumentType.HISTOGRAM) {
+        return { type: sdk_metrics_1.AggregationType.EXPONENTIAL_HISTOGRAM };
+    }
+    return { type: sdk_metrics_1.AggregationType.DEFAULT };
+};
+var ProductCompatibilityMode;
+(function (ProductCompatibilityMode) {
+    ProductCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
+})(ProductCompatibilityMode || (ProductCompatibilityMode = {}));
 exports.monitoringAttributes = {
     ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
     ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id",
     ...semanticConventions
 };
+// The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
+// of resource detectors instead of using the defaults.
+const resourceDetectors = [resources_2.envDetector, resources_2.processDetector, resources_2.hostDetector, resources_2.osDetector, resource_detector_aws_1.awsEc2Detector];
 let __activeOtlpSdkInstance = null;
+let __activeMeterProvider = null;
+// The "@aws/aws-distro-opentelemetry-node-autoinstrumentation" is the package that AWS recommends you use if you want
+// to instrumenta NodeJS application using OpenTelemetry.  However the package does not allow the consumer to customize
+// any of the OpenTelemetry instrumentation behaviour.  We want to achieve compatibility with CloudWatch in the same way
+// that "@aws/aws-distro-opentelemetry-node-autoinstrumentation" does, while also allowing customization of
+// OpenTelemetry functionality. To do this, we import some pieces of
+// "@aws/aws-distro-opentelemetry-node-autoinstrumentation" that are not explicitly exported.  This is a hack and may
+// break if the installed version of "@aws/aws-distro-opentelemetry-node-autoinstrumentation" is upgraded.
+// This would not be necessary if "@aws/aws-distro-opentelemetry-node-autoinstrumentation" was open for customization,
+// but it is completely closed.
+function loadCloudWatchProprietaryComponents() {
+    const packageBuildDir = path.dirname(require.resolve("@aws/aws-distro-opentelemetry-node-autoinstrumentation/register"));
+    const { AlwaysRecordSampler } = require(path.join(packageBuildDir, "always-record-sampler.js"));
+    const { AttributePropagatingSpanProcessorBuilder } = require(path.join(packageBuildDir, "attribute-propagating-span-processor-builder.js"));
+    const { AwsSpanMetricsProcessorBuilder } = require(path.join(packageBuildDir, "aws-span-metrics-processor-builder.js"));
+    const { AwsMetricAttributesSpanExporterBuilder } = require(path.join(packageBuildDir, "aws-metric-attributes-span-exporter-builder.js"));
+    return {
+        AlwaysRecordSampler,
+        AttributePropagatingSpanProcessorBuilder,
+        AwsSpanMetricsProcessorBuilder,
+        AwsMetricAttributesSpanExporterBuilder
+    };
+}
+function getSampler(samplePercentage = DEFAULT_SAMPLE_PERCENTAGE) {
+    // Wrap the root sampler in a ParentBasedSampler so that a service honours any sampling decision
+    // that was made upstream (propagated in the incoming trace context) instead of re-deciding on its own.
+    // This keeps distributed traces intact across services when samplePercentage is less than 100.
+    const rootSampler = samplePercentage === 100 ?
+        new sdk_trace_base_1.AlwaysOnSampler() : new sdk_trace_base_1.TraceIdRatioBasedSampler(samplePercentage / 100);
+    return new sdk_trace_base_1.ParentBasedSampler({ root: rootSampler });
+}
+function getSdkConfigurationForGenericProduct(options) {
+    const { serviceName, traceDestinationUrl, samplePercentage } = options;
+    const resource = (0, resources_1.resourceFromAttributes)({
+        [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
+    });
+    const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
+        new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
+            url: traceDestinationUrl
+        });
+    const spanProcessor = global.__btrz_monitoring__spanProcessorForTests ||
+        new sdk_trace_base_1.BatchSpanProcessor(traceExporter, {
+            maxExportBatchSize: 4096,
+            maxQueueSize: 8192
+        });
+    return {
+        resource,
+        resourceDetectors,
+        autoDetectResources: true,
+        idGenerator: undefined, // Use the default id generator
+        spanProcessors: [spanProcessor],
+        sampler: getSampler(samplePercentage),
+        textMapPropagator: undefined, // Use the default propagator
+    };
+}
+function getSdkConfigurationForCloudwatch(options) {
+    const { serviceName, traceDestinationUrl, metricDestinationUrl, samplePercentage } = options;
+    const { AlwaysRecordSampler, AttributePropagatingSpanProcessorBuilder, AwsSpanMetricsProcessorBuilder, AwsMetricAttributesSpanExporterBuilder } = loadCloudWatchProprietaryComponents();
+    // The resource must be fully resolved before it is passed through other Cloudwatch-specific SDK components
+    // (ie. the span exporter), otherwise the metric data generated from the spans will be missing important resource attributes.
+    const resource = (0, resources_1.defaultResource)()
+        .merge((0, resources_1.detectResources)({ detectors: resourceDetectors }))
+        .merge((0, resources_1.resourceFromAttributes)({
+        [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
+    }));
+    const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
+        new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
+            url: traceDestinationUrl
+        });
+    // Record every span (even sampled-out ones) so that CloudWatch metrics are generated for
+    // 100% of traffic without changing the trace sampling rate.
+    const sampler = AlwaysRecordSampler.create(getSampler(samplePercentage));
+    // Wrap the trace exporter so exported spans carry the aws.local.* / aws.remote.* attributes that
+    // correlate traces with the CloudWatch Application Signals metrics.
+    const spanExporter = AwsMetricAttributesSpanExporterBuilder
+        .create(traceExporter, resource)
+        .build();
+    const spanProcessor = global.__btrz_monitoring__spanProcessorForTests ||
+        new sdk_trace_base_1.BatchSpanProcessor(spanExporter, {
+            maxExportBatchSize: 4096,
+            maxQueueSize: 8192
+        });
+    const metricExporter = new exporter_metrics_otlp_grpc_1.OTLPMetricExporter({
+        url: metricDestinationUrl,
+        temporalityPreference: exporter_metrics_otlp_http_1.AggregationTemporalityPreference.DELTA, // Required by CloudWatch Application Signals
+        aggregationPreference: cloudWatchAggregationSelector
+    });
+    const metricReader = new sdk_metrics_1.PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: METRIC_EXPORT_INTERVAL_MILLIS
+    });
+    const meterProvider = new sdk_metrics_1.MeterProvider({
+        resource,
+        readers: [metricReader]
+    });
+    __activeMeterProvider = meterProvider;
+    // Order is important here. The attribute-propagating processor runs first to copy attributes down to
+    // child spans, and the span-metrics processor runs afterward to produce related metrics.
+    const spanProcessors = [
+        spanProcessor,
+        AttributePropagatingSpanProcessorBuilder.create().build(),
+        AwsSpanMetricsProcessorBuilder
+            .create(meterProvider, resource, meterProvider.forceFlush.bind(meterProvider))
+            .build()
+    ];
+    return {
+        resource,
+        resourceDetectors: undefined, // No need for the Otel SDK to detect resources since we already did this above
+        autoDetectResources: false,
+        idGenerator: new id_generator_aws_xray_1.AWSXRayIdGenerator(),
+        spanProcessors,
+        sampler,
+        textMapPropagator: new propagator_aws_xray_1.AWSXRayPropagator(),
+    };
+}
+function getSdkConfiguration(options) {
+    const { productCompatibility } = options;
+    if (productCompatibility === ProductCompatibilityMode.CLOUDWATCH) {
+        return getSdkConfigurationForCloudwatch(options);
+    }
+    else {
+        return getSdkConfigurationForGenericProduct(options);
+    }
+}
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled = true, serviceName, samplePercentage = 100, traceDestinationUrl, traceCompatibility, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
+    const { enabled = true, samplePercentage = DEFAULT_SAMPLE_PERCENTAGE, metricDestinationUrl, productCompatibility, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
+    (0, node_assert_1.default)(!(productCompatibility === ProductCompatibilityMode.CLOUDWATCH && !metricDestinationUrl), "You must provide a metricDestinationUrl when sending telemetry to CloudWatch");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
         return {
             shutdownTracing: async () => { }
@@ -98,31 +242,9 @@ function initializeTracing(options) {
     if (enableFilesystemTracing) {
         forcefullyEnableFilesystemTracing();
     }
-    // The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
-    // of resource detectors instead of using the defaults.
-    const resourceDetectors = [resources_2.envDetector, resources_2.processDetector, resources_2.hostDetector, resources_2.osDetector, resource_detector_aws_1.awsEc2Detector];
-    const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
-        new exporter_trace_otlp_grpc_1.OTLPTraceExporter({
-            url: traceDestinationUrl
-        });
-    const traceIdGenerator = traceCompatibility === TraceCompatibilityMode.CLOUDWATCH ?
-        new id_generator_aws_xray_1.AWSXRayIdGenerator() : undefined;
-    const spanProcessor = global.__btrz_monitoring__spanProcessorForTests ||
-        new sdk_trace_base_1.BatchSpanProcessor(traceExporter, {
-            maxExportBatchSize: 4096,
-            maxQueueSize: 8192
-        });
-    const propagator = traceCompatibility === TraceCompatibilityMode.CLOUDWATCH ?
-        new propagator_aws_xray_1.AWSXRayPropagator() : undefined;
+    const sdkConfiguration = getSdkConfiguration(options);
     const sdk = new sdk_node_1.NodeSDK({
-        resource: (0, resources_1.resourceFromAttributes)({
-            [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
-        }),
-        resourceDetectors,
-        spanProcessors: [spanProcessor],
-        sampler: samplePercentage === 100 ? new sdk_trace_base_1.AlwaysOnSampler() : new sdk_trace_base_1.TraceIdRatioBasedSampler(samplePercentage / 100),
-        idGenerator: traceIdGenerator,
-        textMapPropagator: propagator,
+        ...sdkConfiguration,
         instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({
                 "@opentelemetry/instrumentation-fs": {
                     enabled: true, // This setting is currently ignored due to a bug.  See setEnabledInstrumentations().
@@ -239,6 +361,7 @@ function shutdownTracing(sdk) {
         try {
             console.log(ansi_colors_1.default.yellow("[btrz-monitoring] Stopping tracing..."));
             await sdk.shutdown();
+            await __activeMeterProvider?.shutdown();
             console.log(ansi_colors_1.default.yellow("[btrz-monitoring] Tracing stopped"));
         }
         catch (error) {
@@ -247,6 +370,7 @@ function shutdownTracing(sdk) {
         }
         finally {
             __activeOtlpSdkInstance = null;
+            __activeMeterProvider = null;
         }
     };
 }

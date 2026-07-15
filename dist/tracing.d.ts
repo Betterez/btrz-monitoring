@@ -1,21 +1,22 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import * as semanticConventions from "@opentelemetry/semantic-conventions";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { SimpleSpanProcessor, InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { AttributeValue, Span, SpanOptions } from "@opentelemetry/api";
 import { BtrzLogger, SimpleDao } from "./types/external.types";
 interface TracingInitOptions {
     enabled?: boolean;
     serviceName: string;
     samplePercentage?: number;
+    productCompatibility?: ProductCompatibilityMode;
     traceDestinationUrl: string;
-    traceCompatibility?: TraceCompatibilityMode;
+    metricDestinationUrl?: string;
     ignoreStaticAssetDir?: string | string[];
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];
     ignoredAwsSqsEvents?: AwsSqsEvent[];
     enableFilesystemTracing?: boolean;
 }
-declare enum TraceCompatibilityMode {
+declare enum ProductCompatibilityMode {
     CLOUDWATCH = "cloudwatch"
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";

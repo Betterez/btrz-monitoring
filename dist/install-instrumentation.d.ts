@@ -15,6 +15,7 @@ interface TracingInitOptions {
     enableFilesystemTracing?: boolean;
 }
 declare enum ProductCompatibilityMode {
+    DEFAULT = "default",
     CLOUDWATCH = "cloudwatch"
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
@@ -23,7 +24,9 @@ type HttpRoute = {
     url: string | RegExp;
 };
 type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
-export declare function initializeTracing(options: TracingInitOptions): {
+export declare function initializeTracing(options: TracingInitOptions & {
+    overrides?: string;
+}): {
     shutdownTracing: () => Promise<void>;
 };
 /**

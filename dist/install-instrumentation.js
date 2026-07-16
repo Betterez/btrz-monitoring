@@ -77,6 +77,7 @@ const cloudWatchAggregationSelector = (instrumentType) => {
 };
 var ProductCompatibilityMode;
 (function (ProductCompatibilityMode) {
+    ProductCompatibilityMode["DEFAULT"] = "default";
     ProductCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
 })(ProductCompatibilityMode || (ProductCompatibilityMode = {}));
 // The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
@@ -207,10 +208,31 @@ function getSdkConfiguration(options) {
         return getSdkConfigurationForGenericProduct(options);
     }
 }
+function applyOverrides(options) {
+    if (options.overrides) {
+        try {
+            const overrides = JSON.parse(options.overrides);
+            return {
+                ...options,
+                enabled: overrides.enabled ?? options.enabled,
+                samplePercentage: overrides.samplePercentage ?? options.samplePercentage,
+                productCompatibility: overrides.productCompatibility ?? options.productCompatibility,
+                traceDestinationUrl: overrides.traceDestinationUrl ?? options.traceDestinationUrl,
+                metricDestinationUrl: overrides.metricDestinationUrl ?? options.metricDestinationUrl,
+            };
+        }
+        catch (error) {
+            console.error(ansi_colors_1.default.red("[btrz-monitoring] Error applying overrides.  The 'overrides' property must be a valid JSON string."));
+            console.error(ansi_colors_1.default.red(util.inspect(error)));
+        }
+    }
+    return options;
+}
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
 function initializeTracing(options) {
-    const { enabled = true, samplePercentage = DEFAULT_SAMPLE_PERCENTAGE, metricDestinationUrl, productCompatibility, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false } = options;
+    const tracingOptions = applyOverrides(options);
+    const { enabled = true, samplePercentage = DEFAULT_SAMPLE_PERCENTAGE, metricDestinationUrl, productCompatibility, ignoreStaticAssetDir = [], ignoredHttpMethods = [], ignoredRoutes = [], ignoredAwsSqsEvents = [], enableFilesystemTracing = false, } = tracingOptions;
     (0, node_assert_1.default)(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
     (0, node_assert_1.default)(!(productCompatibility === ProductCompatibilityMode.CLOUDWATCH && !metricDestinationUrl), "You must provide a metricDestinationUrl when sending telemetry to CloudWatch");
     if (enabled === false || node_process_1.default.env.NODE_ENV === "test") {
@@ -231,7 +253,7 @@ function initializeTracing(options) {
     if (enableFilesystemTracing) {
         forcefullyEnableFilesystemTracing();
     }
-    const sdkConfiguration = getSdkConfiguration(options);
+    const sdkConfiguration = getSdkConfiguration(tracingOptions);
     const sdk = new sdk_node_1.NodeSDK({
         ...sdkConfiguration,
         instrumentations: [(0, auto_instrumentations_node_1.getNodeAutoInstrumentations)({

@@ -36,13 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.monitoringAttributes = void 0;
 exports.initializeTracing = initializeTracing;
-exports.trace = trace;
-exports.withTracing = withTracing;
-exports.getActiveSpan = getActiveSpan;
-exports.setAttributeOnSpan = setAttributeOnSpan;
-exports.setAttributeOnActiveSpan = setAttributeOnActiveSpan;
 exports.warmUpDatabaseConnectionForTracing = warmUpDatabaseConnectionForTracing;
 exports.__enableTestMode = __enableTestMode;
 exports.__getActiveOtlpSdkInstance = __getActiveOtlpSdkInstance;
@@ -52,7 +46,6 @@ const path = __importStar(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
 const util = __importStar(require("node:util"));
 const ansi_colors_1 = __importDefault(require("ansi-colors"));
-const escape_string_regexp_1 = require("./escape-string-regexp");
 const sdk_node_1 = require("@opentelemetry/sdk-node");
 const auto_instrumentations_node_1 = require("@opentelemetry/auto-instrumentations-node");
 const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
@@ -60,7 +53,6 @@ const exporter_metrics_otlp_grpc_1 = require("@opentelemetry/exporter-metrics-ot
 const exporter_metrics_otlp_http_1 = require("@opentelemetry/exporter-metrics-otlp-http");
 const sdk_metrics_1 = require("@opentelemetry/sdk-metrics");
 const resources_1 = require("@opentelemetry/resources");
-const semanticConventions = __importStar(require("@opentelemetry/semantic-conventions"));
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
@@ -68,6 +60,8 @@ const id_generator_aws_xray_1 = require("@opentelemetry/id-generator-aws-xray");
 const propagator_aws_xray_1 = require("@opentelemetry/propagator-aws-xray");
 const resources_2 = require("@opentelemetry/resources");
 const resource_detector_aws_1 = require("@opentelemetry/resource-detector-aws");
+const attributes_1 = require("./attributes");
+const escape_string_regexp_1 = require("./escape-string-regexp");
 const DEFAULT_SAMPLE_PERCENTAGE = 100;
 // When exporting to CloudWatch, the metrics export interval must not exceed 60 seconds or metric/trace correlation
 // will not work correctly.
@@ -85,11 +79,6 @@ var ProductCompatibilityMode;
 (function (ProductCompatibilityMode) {
     ProductCompatibilityMode["CLOUDWATCH"] = "cloudwatch";
 })(ProductCompatibilityMode || (ProductCompatibilityMode = {}));
-exports.monitoringAttributes = {
-    ATTR_BTRZ_ACCOUNT_ID: "btrz.account.id",
-    ATTR_BTRZ_PROVIDER_ID: "btrz.provider.id",
-    ...semanticConventions
-};
 // The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
 // of resource detectors instead of using the defaults.
 const resourceDetectors = [resources_2.envDetector, resources_2.processDetector, resources_2.hostDetector, resources_2.osDetector, resource_detector_aws_1.awsEc2Detector];
@@ -277,13 +266,13 @@ function initializeTracing(options) {
                 "@opentelemetry/instrumentation-express": {
                     requestHook(span, info) {
                         if (info.request.account?.accountId) {
-                            span.setAttribute(exports.monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.account.accountId);
+                            span.setAttribute(attributes_1.monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.account.accountId);
                         }
                         else if (info.request.session?.account?._id) {
-                            span.setAttribute(exports.monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.session.account._id);
+                            span.setAttribute(attributes_1.monitoringAttributes.ATTR_BTRZ_ACCOUNT_ID, info.request.session.account._id);
                         }
                         if (info.request.session?.networkContext?.providerIds) {
-                            span.setAttribute(exports.monitoringAttributes.ATTR_BTRZ_PROVIDER_ID, info.request.session.networkContext.providerIds);
+                            span.setAttribute(attributes_1.monitoringAttributes.ATTR_BTRZ_PROVIDER_ID, info.request.session.networkContext.providerIds);
                         }
                     }
                 }
@@ -374,160 +363,6 @@ function shutdownTracing(sdk) {
         }
     };
 }
-function trace(arg1, arg2, arg3) {
-    const tracer = api_1.trace.getTracer("btrz-monitoring");
-    const { spanNameFromArgs, traceOptions, functionToTrace } = extractArguments(arg1, arg2, arg3);
-    const spanName = spanNameFromArgs || functionToTrace.name || getNameOfCallingFunction() || "unnamed trace";
-    let result;
-    const { inheritAttributesFromParentTrace, ..._spanOptions } = traceOptions;
-    const activeSpan = api_1.trace.getActiveSpan();
-    let attributesToCopy = {};
-    let linksToCopy = [];
-    let spanKind = api_1.SpanKind.INTERNAL;
-    if (inheritAttributesFromParentTrace && activeSpan) {
-        attributesToCopy = getSpanAttributes(activeSpan);
-        linksToCopy = getSpanLinks(activeSpan);
-        spanKind = getSpanKind(activeSpan);
-    }
-    const spanOptions = {
-        ..._spanOptions,
-        attributes: {
-            [semantic_conventions_1.ATTR_CODE_FUNCTION_NAME]: functionToTrace.name || getNameOfCallingFunction() || undefined,
-            ...attributesToCopy,
-            ...(_spanOptions.attributes || {})
-        },
-        links: [...(_spanOptions.links || []), ...linksToCopy],
-        kind: _spanOptions.kind ?? spanKind,
-    };
-    tracer.startActiveSpan(spanName, spanOptions, (span) => {
-        try {
-            result = functionToTrace();
-        }
-        catch (synchronousError) {
-            attachErrorToSpan(synchronousError, span);
-            span.end();
-            throw synchronousError;
-        }
-        if (isPromiseLike(result)) {
-            result = Promise.resolve(result)
-                .then((result) => {
-                span.setStatus({
-                    code: api_1.SpanStatusCode.OK
-                });
-                span.end();
-                return result;
-            }, (_error) => {
-                attachErrorToSpan(_error, span);
-                span.end();
-                throw _error;
-            });
-        }
-        else {
-            span.setStatus({
-                code: api_1.SpanStatusCode.OK
-            });
-            span.end();
-        }
-    });
-    return result;
-}
-function withTracing(arg1, arg2, arg3) {
-    const { spanNameFromArgs, traceOptions, functionToTrace } = extractArguments(arg1, arg2, arg3);
-    const spanName = spanNameFromArgs || simplifyFunctionName(functionToTrace.name) || getNameOfCallingFunction() || "unnamed trace";
-    const wrapperFunction = (...args) => {
-        const traceExecutor = () => functionToTrace(...args);
-        Object.defineProperty(traceExecutor, "name", { value: functionToTrace.name });
-        return trace(spanName, traceOptions, traceExecutor);
-    };
-    Object.defineProperty(wrapperFunction, "length", { value: functionToTrace.length });
-    Object.defineProperty(wrapperFunction, "name", { value: functionToTrace.name });
-    return wrapperFunction;
-}
-function extractArguments(arg1, arg2, arg3) {
-    let spanNameFromArgs;
-    let traceOptions;
-    let functionToTrace;
-    if (typeof arg1 === "function") {
-        functionToTrace = arg1;
-        spanNameFromArgs = undefined;
-        traceOptions = {};
-    }
-    else if (typeof arg1 === "string" && typeof arg2 === "function") {
-        spanNameFromArgs = arg1;
-        functionToTrace = arg2;
-        traceOptions = {};
-    }
-    else if (typeof arg1 === "object" && typeof arg2 === "function") {
-        traceOptions = arg1;
-        functionToTrace = arg2;
-        spanNameFromArgs = undefined;
-    }
-    else {
-        spanNameFromArgs = arg1;
-        traceOptions = arg2 || {};
-        functionToTrace = arg3;
-    }
-    return {
-        spanNameFromArgs,
-        traceOptions,
-        functionToTrace
-    };
-}
-function attachErrorToSpan(error, span) {
-    span.setStatus({
-        code: api_1.SpanStatusCode.ERROR,
-        message: error?.message
-    });
-    span.setAttributes({
-        [semantic_conventions_1.ATTR_EXCEPTION_MESSAGE]: error?.message,
-        [semantic_conventions_1.ATTR_EXCEPTION_STACKTRACE]: error?.stack
-    });
-}
-function getSpanAttributes(span) {
-    if (!span || !span.attributes) {
-        return {};
-    }
-    return span.attributes;
-}
-function getSpanLinks(span) {
-    if (!span || !span.links) {
-        return [];
-    }
-    return span.links;
-}
-function getSpanKind(span) {
-    if (!span || !span.kind) {
-        return api_1.SpanKind.INTERNAL;
-    }
-    return span.kind;
-}
-function isPromiseLike(value) {
-    return typeof value?.then === "function";
-}
-// Adapted from https://devimalplanet.com/javascript-how-to-get-the-caller-parent-functions-name
-function getNameOfCallingFunction() {
-    const e = new Error();
-    // matches this function, the caller and the parent
-    const allMatches = e.stack?.match(/(\w+)@|at(.*) [(\/\\]/g) ?? [];
-    // match parent function name
-    const parentMatches = allMatches[2]?.match(/(\w+)@|at(.*) [(\/\\]/) ?? [];
-    // return only name
-    return simplifyFunctionName(parentMatches[1] || parentMatches[2]);
-}
-function simplifyFunctionName(functionName) {
-    return (functionName || "")
-        .trim()
-        .replace(/^bound /, "");
-}
-function getActiveSpan() {
-    return api_1.trace.getActiveSpan();
-}
-function setAttributeOnSpan(span, key, value) {
-    span?.setAttribute(key, value);
-}
-function setAttributeOnActiveSpan(key, value) {
-    return setAttributeOnSpan(api_1.trace.getActiveSpan(), key, value);
-}
 /**
  * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a
  * polling process between the mongodb driver and the Mongo server. If the connection is not warmed up on server start, the first API which
@@ -567,4 +402,4 @@ function __enableTestMode() {
 function __getActiveOtlpSdkInstance() {
     return __activeOtlpSdkInstance;
 }
-//# sourceMappingURL=tracing.js.map
+//# sourceMappingURL=install-instrumentation.js.map

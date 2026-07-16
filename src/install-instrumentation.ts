@@ -87,7 +87,8 @@ const cloudWatchAggregationSelector: AggregationSelector = (instrumentType) => {
 };
 
 enum ProductCompatibilityMode {
-  CLOUDWATCH = "cloudwatch"
+  DEFAULT = "default",
+  CLOUDWATCH = "cloudwatch",
 }
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
@@ -281,9 +282,31 @@ function getSdkConfiguration(options: TracingInitOptions): {
   }
 }
 
+function applyOverrides(options: TracingInitOptions & {overrides?: string}): TracingInitOptions {
+  if (options.overrides) {
+    try {
+      const overrides = JSON.parse(options.overrides) as Partial<TracingInitOptions>;
+      return {
+        ...options,
+        enabled: overrides.enabled ?? options.enabled,
+        samplePercentage: overrides.samplePercentage ?? options.samplePercentage,
+        productCompatibility: overrides.productCompatibility ?? options.productCompatibility,
+        traceDestinationUrl: overrides.traceDestinationUrl ?? options.traceDestinationUrl,
+        metricDestinationUrl: overrides.metricDestinationUrl ?? options.metricDestinationUrl,
+      };
+    } catch (error) {
+      console.error(color.red("[btrz-monitoring] Error applying overrides.  The 'overrides' property must be a valid JSON string."));
+      console.error(color.red(util.inspect(error)));
+    }
+  }
+
+  return options;
+}
+
 // This must be executed before any other code (including "require" / "import" statements) or the tracing
 // instrumentation may not be installed
-export function initializeTracing(options: TracingInitOptions) {
+export function initializeTracing(options: TracingInitOptions & {overrides?: string}) {
+  const tracingOptions = applyOverrides(options);
   const {
     enabled = true,
     samplePercentage = DEFAULT_SAMPLE_PERCENTAGE,
@@ -293,8 +316,8 @@ export function initializeTracing(options: TracingInitOptions) {
     ignoredHttpMethods = [],
     ignoredRoutes = [],
     ignoredAwsSqsEvents = [],
-    enableFilesystemTracing = false
-  } = options;
+    enableFilesystemTracing = false,
+  } = tracingOptions;
 
   assert(samplePercentage >= 0 && samplePercentage <= 100, "samplePercentage must be a number between 0 and 100");
   assert(!(productCompatibility === ProductCompatibilityMode.CLOUDWATCH && !metricDestinationUrl),
@@ -322,7 +345,7 @@ export function initializeTracing(options: TracingInitOptions) {
     forcefullyEnableFilesystemTracing();
   }
 
-  const sdkConfiguration = getSdkConfiguration(options);
+  const sdkConfiguration = getSdkConfiguration(tracingOptions);
 
   const sdk = new NodeSDK({
     ...sdkConfiguration,

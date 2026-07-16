@@ -9,14 +9,18 @@ import color from "ansi-colors";
 import {
   __enableTestMode,
   __getActiveOtlpSdkInstance,
-  monitoringAttributes,
   initializeTracing,
+} from "../src/install-instrumentation";
+import {
   trace,
   withTracing,
   getActiveSpan,
   setAttributeOnSpan,
   setAttributeOnActiveSpan,
-} from "../src/tracing";
+} from "../src/manual-tracing";
+import {
+  monitoringAttributes
+} from "../src/attributes";
 import {InMemorySpanExporter, SimpleSpanProcessor} from "@opentelemetry/sdk-trace-base";
 import {ATTR_EXCEPTION_MESSAGE, ATTR_EXCEPTION_STACKTRACE, ATTR_CODE_FUNCTION_NAME} from "@opentelemetry/semantic-conventions";
 import {ATTR_ARTIFACT_VERSION} from "@opentelemetry/semantic-conventions/incubating";

@@ -54,6 +54,7 @@ const exporter_metrics_otlp_http_1 = require("@opentelemetry/exporter-metrics-ot
 const sdk_metrics_1 = require("@opentelemetry/sdk-metrics");
 const resources_1 = require("@opentelemetry/resources");
 const semantic_conventions_1 = require("@opentelemetry/semantic-conventions");
+const incubating_1 = require("@opentelemetry/semantic-conventions/incubating");
 const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
 const api_1 = require("@opentelemetry/api");
 const id_generator_aws_xray_1 = require("@opentelemetry/id-generator-aws-xray");
@@ -86,7 +87,7 @@ const resourceDetectors = [resources_2.envDetector, resources_2.processDetector,
 let __activeOtlpSdkInstance = null;
 let __activeMeterProvider = null;
 // The "@aws/aws-distro-opentelemetry-node-autoinstrumentation" is the package that AWS recommends you use if you want
-// to instrumenta NodeJS application using OpenTelemetry.  However the package does not allow the consumer to customize
+// to instrument a NodeJS application using OpenTelemetry.  However, the package does not allow the consumer to customize
 // any of the OpenTelemetry instrumentation behaviour.  We want to achieve compatibility with CloudWatch in the same way
 // that "@aws/aws-distro-opentelemetry-node-autoinstrumentation" does, while also allowing customization of
 // OpenTelemetry functionality. To do this, we import some pieces of
@@ -147,7 +148,8 @@ function getSdkConfigurationForCloudwatch(options) {
     const resource = (0, resources_1.defaultResource)()
         .merge((0, resources_1.detectResources)({ detectors: resourceDetectors }))
         .merge((0, resources_1.resourceFromAttributes)({
-        [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName
+        [semantic_conventions_1.ATTR_SERVICE_NAME]: serviceName,
+        [incubating_1.ATTR_AWS_LOG_GROUP_NAMES]: serviceName
     }));
     const traceExporter = global.__btrz_monitoring__spanExporterForTests ||
         new exporter_trace_otlp_grpc_1.OTLPTraceExporter({

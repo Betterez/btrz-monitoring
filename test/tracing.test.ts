@@ -137,7 +137,7 @@ describe("Tracing instrumentation", () => {
     describe("when tracing a synchronous non-arrow function", () => {
       function syncFn() {
         let i = 0;
-        while (i < 100000) {
+        while (i < 10000) {
           i++;
         }
         return "syncFn return value";

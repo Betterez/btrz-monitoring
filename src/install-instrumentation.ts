@@ -27,6 +27,7 @@ import {
   resourceFromAttributes
 } from "@opentelemetry/resources";
 import {ATTR_SERVICE_NAME} from "@opentelemetry/semantic-conventions";
+import {ATTR_AWS_LOG_GROUP_NAMES} from "@opentelemetry/semantic-conventions/incubating";
 import {
   SpanProcessor,
   SimpleSpanProcessor,
@@ -116,7 +117,7 @@ interface CloudWatchProprietaryComponents {
 }
 
 // The "@aws/aws-distro-opentelemetry-node-autoinstrumentation" is the package that AWS recommends you use if you want
-// to instrumenta NodeJS application using OpenTelemetry.  However the package does not allow the consumer to customize
+// to instrument a NodeJS application using OpenTelemetry.  However, the package does not allow the consumer to customize
 // any of the OpenTelemetry instrumentation behaviour.  We want to achieve compatibility with CloudWatch in the same way
 // that "@aws/aws-distro-opentelemetry-node-autoinstrumentation" does, while also allowing customization of
 // OpenTelemetry functionality. To do this, we import some pieces of
@@ -204,7 +205,8 @@ function getSdkConfigurationForCloudwatch(options: TracingInitOptions) {
     .merge(detectResources({detectors: resourceDetectors}))
     .merge(
       resourceFromAttributes({
-        [ATTR_SERVICE_NAME]: serviceName
+        [ATTR_SERVICE_NAME]: serviceName,
+        [ATTR_AWS_LOG_GROUP_NAMES]: serviceName
       })
     );
 

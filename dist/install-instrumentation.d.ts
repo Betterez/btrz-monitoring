@@ -1,22 +1,17 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { SimpleSpanProcessor, InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { BtrzLogger, SimpleDao } from "./types/external.types";
-interface TracingInitOptions {
+interface MonitoringInitOptions {
     enabled?: boolean;
     serviceName: string;
     samplePercentage?: number;
-    productCompatibility?: ProductCompatibilityMode;
     traceDestinationUrl: string;
-    metricDestinationUrl?: string;
+    metricsPort?: string;
     ignoreStaticAssetDir?: string | string[];
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];
     ignoredAwsSqsEvents?: AwsSqsEvent[];
     enableFilesystemTracing?: boolean;
-}
-declare enum ProductCompatibilityMode {
-    DEFAULT = "default",
-    CLOUDWATCH = "cloudwatch"
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "CONNECT" | "TRACE";
 type HttpRoute = {
@@ -24,10 +19,10 @@ type HttpRoute = {
     url: string | RegExp;
 };
 type AwsSqsEvent = "ReceiveMessage" | "ProcessMessage";
-export declare function initializeTracing(options: TracingInitOptions & {
+export declare function initializeMonitoring(options: MonitoringInitOptions & {
     overrides?: string;
 }): {
-    shutdownTracing: () => Promise<void>;
+    shutdownMonitoring: () => Promise<void>;
 };
 /**
  * Warming-up the database connection is done to improve the legibility of traces. The first connection to the database will initiate a

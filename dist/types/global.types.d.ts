@@ -2,6 +2,6 @@ import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-tr
 declare global {
     var __btrz_monitoring__spanExporterForTests: InMemorySpanExporter;
     var __btrz_monitoring__spanProcessorForTests: SimpleSpanProcessor;
-    var __btrz_monitoring__didInitializeTracing: boolean;
+    var __btrz_monitoring__didInitializeMonitoring: boolean;
 }
 export {};

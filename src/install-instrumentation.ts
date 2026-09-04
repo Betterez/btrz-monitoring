@@ -34,13 +34,14 @@ import {awsEc2Detector} from "@opentelemetry/resource-detector-aws";
 import {BtrzLogger, SimpleDao} from "./types/external.types";
 import {monitoringAttributes} from "./attributes";
 import {escapeStringRegexp} from "./escape-string-regexp";
+import {publishMetrics} from "./metrics";
 
 interface MonitoringInitOptions {
   enabled?: boolean;
   serviceName: string;
   samplePercentage?: number;
   traceDestinationUrl: string;
-  metricsPort?: string;
+  metricsPort?: number;
   ignoreStaticAssetDir?: string | string[];
   ignoredHttpMethods?: HttpMethod[];
   ignoredRoutes?: HttpRoute[];
@@ -147,6 +148,10 @@ export function initializeMonitoring(options: MonitoringInitOptions & {overrides
     return {
       shutdownMonitoring: async () => {}
     };
+  }
+
+  if (metricsPort) {
+    publishMetrics({serviceName, metricsPort});
   }
 
   const staticAssetDirectoriesToIgnore = Array.isArray(ignoreStaticAssetDir) ? ignoreStaticAssetDir : [ignoreStaticAssetDir];

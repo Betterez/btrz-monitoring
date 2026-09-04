@@ -9,7 +9,7 @@ import color from "ansi-colors";
 import {
   __enableTestMode,
   __getActiveOtlpSdkInstance,
-  initializeTracing,
+  initializeMonitoring,
 } from "../src/install-instrumentation";
 import {
   trace,
@@ -37,9 +37,9 @@ describe("Tracing instrumentation", () => {
 
     // When running tests in "watch" mode, the tracing instrumentation must be initialized only once (during the
     // first test run) or a stack overflow will eventually occur.
-    if (!global.__btrz_monitoring__didInitializeTracing) {
-      global.__btrz_monitoring__didInitializeTracing = true;
-      initializeTracing({
+    if (!global.__btrz_monitoring__didInitializeMonitoring) {
+      global.__btrz_monitoring__didInitializeMonitoring = true;
+      initializeMonitoring({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
       });
@@ -56,7 +56,7 @@ describe("Tracing instrumentation", () => {
     return spanExporter.getFinishedSpans();
   }
 
-  describe("initializeTracing()", () => {
+  describe("initializeMonitoring()", () => {
     it("should not require chalk as a runtime dependency", () => {
       const packageJsonPath = path.resolve(__dirname, "../package.json");
       const packageJsonContents = fs.readFileSync(packageJsonPath, "utf8");
@@ -65,23 +65,23 @@ describe("Tracing instrumentation", () => {
       assert.equal(packageJson.dependencies?.chalk, undefined);
     });
 
-    it("should return a shutdownTracing() function which gracefully shuts down the tracing instrumentation", async () => {
-      const {shutdownTracing} = initializeTracing({
+    it("should return a shutdownMonitoring() function which gracefully shuts down the tracing instrumentation", async () => {
+      const {shutdownMonitoring} = initializeMonitoring({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
       });
 
-      assert.equal(typeof shutdownTracing, "function");
+      assert.equal(typeof shutdownMonitoring, "function");
 
       const sdk = __getActiveOtlpSdkInstance()!;
       const sdkShutdownStub = mock.method(sdk, "shutdown", async () => undefined);
 
-      await shutdownTracing();
+      await shutdownMonitoring();
       assert.equal(sdkShutdownStub.mock.callCount(), 1);
     });
 
-    it("should return a shutdownTracing() function that swallows any errors which occur when shutting down the tracing instrumentation", async () => {
-      const {shutdownTracing} = initializeTracing({
+    it("should return a shutdownMonitoring() function that swallows any errors which occur when shutting down the tracing instrumentation", async () => {
+      const {shutdownMonitoring} = initializeMonitoring({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
       });
@@ -91,12 +91,12 @@ describe("Tracing instrumentation", () => {
         throw new Error("Some error");
       });
 
-      await shutdownTracing();
+      await shutdownMonitoring();
       // If no rejection occurred, the test has passed.
     });
 
     it("should log shutdown status messages", async () => {
-      const {shutdownTracing} = initializeTracing({
+      const {shutdownMonitoring} = initializeMonitoring({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
       });
@@ -105,7 +105,7 @@ describe("Tracing instrumentation", () => {
       mock.method(sdk, "shutdown", async () => undefined);
       const logStub = mock.method(console, "log", () => undefined);
 
-      await shutdownTracing();
+      await shutdownMonitoring();
 
       assert.equal(logStub.mock.callCount(), 2);
       assert.equal(logStub.mock.calls[0].arguments[0], color.yellow("[btrz-monitoring] Stopping tracing..."));
@@ -113,7 +113,7 @@ describe("Tracing instrumentation", () => {
     });
 
     it("should log error details if tracing shutdown fails", async () => {
-      const {shutdownTracing} = initializeTracing({
+      const {shutdownMonitoring} = initializeMonitoring({
         serviceName: "btrz-monitoring-tests",
         traceDestinationUrl: "http://localhost:4317"
       });
@@ -125,7 +125,7 @@ describe("Tracing instrumentation", () => {
       });
       const errorStub = mock.method(console, "error", () => undefined);
 
-      await shutdownTracing();
+      await shutdownMonitoring();
 
       assert.equal(errorStub.mock.callCount(), 2);
       assert.equal(errorStub.mock.calls[0].arguments[0], color.red("[btrz-monitoring] Error while stopping tracing"));

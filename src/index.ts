@@ -1,5 +1,5 @@
 export {
-  initializeTracing,
+  initializeMonitoring,
   warmUpDatabaseConnectionForTracing,
 } from "./install-instrumentation";
 export {

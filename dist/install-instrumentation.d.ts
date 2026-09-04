@@ -6,7 +6,7 @@ interface MonitoringInitOptions {
     serviceName: string;
     samplePercentage?: number;
     traceDestinationUrl: string;
-    metricsPort?: string;
+    metricsPort?: number;
     ignoreStaticAssetDir?: string | string[];
     ignoredHttpMethods?: HttpMethod[];
     ignoredRoutes?: HttpRoute[];

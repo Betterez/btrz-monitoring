@@ -57,6 +57,7 @@ const resources_2 = require("@opentelemetry/resources");
 const resource_detector_aws_1 = require("@opentelemetry/resource-detector-aws");
 const attributes_1 = require("./attributes");
 const escape_string_regexp_1 = require("./escape-string-regexp");
+const metrics_1 = require("./metrics");
 const DEFAULT_SAMPLE_PERCENTAGE = 100;
 // The default resource detectors do not include the "awsEc2Detector".  To add it, we must define our own list
 // of resource detectors instead of using the defaults.
@@ -122,6 +123,9 @@ function initializeMonitoring(options) {
         return {
             shutdownMonitoring: async () => { }
         };
+    }
+    if (metricsPort) {
+        (0, metrics_1.publishMetrics)({ serviceName, metricsPort });
     }
     const staticAssetDirectoriesToIgnore = Array.isArray(ignoreStaticAssetDir) ? ignoreStaticAssetDir : [ignoreStaticAssetDir];
     const staticAssetUrlPatternsToIgnore = staticAssetDirectoriesToIgnore.map((directory) => {

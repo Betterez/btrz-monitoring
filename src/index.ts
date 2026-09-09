@@ -3,6 +3,9 @@ export {
   warmUpDatabaseConnectionForTracing,
 } from "./install-instrumentation";
 export {
+  monitorMongoDbClient
+} from "./mongodb-metrics";
+export {
   trace,
   withTracing,
   getActiveSpan,

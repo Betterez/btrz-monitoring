@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.monitorMongoDbClient = monitorMongoDbClient;
+const node_util_1 = __importDefault(require("node:util"));
 const client_1 = __importDefault(require("@prometheus-io/client"));
 const ansi_colors_1 = __importDefault(require("ansi-colors"));
 const monitoredMongoDbClients = new WeakSet();
@@ -98,7 +99,13 @@ function readConfiguredMaxPoolSize(db) {
     return typeof optionMax === "number" ? optionMax : DEFAULT_MAX_POOL_SIZE;
 }
 async function monitorMongoDbClient(simpleDao) {
-    const db = await simpleDao.getCurrentClient();
+    let db;
+    try {
+        db = await simpleDao.getCurrentClient();
+    }
+    catch (error) {
+        console.log(ansi_colors_1.default.red(node_util_1.default.inspect(error)));
+    }
     if (!db) {
         console.log(ansi_colors_1.default.red("[btrz-monitoring] Unable to get current MongoDB client"));
         return;

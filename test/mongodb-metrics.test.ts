@@ -60,6 +60,26 @@ describe("monitorMongoDbClient()", () => {
     assert.equal(logStub.mock.calls[0].arguments[0].includes("Unable to get current MongoDB client"), true);
   });
 
+  it("should log the error and do nothing when retrieving the MongoDB client rejects", async () => {
+    const retrievalError = new Error("Could not connect to MongoDB");
+    const failingSimpleDao: SimpleDao = {
+      connect: async () => undefined,
+      getCurrentClient: async () => {
+        throw retrievalError;
+      }
+    };
+    const logStub = mock.method(console, "log", () => undefined);
+
+    // A rejection from getCurrentClient() must not propagate out of monitorMongoDbClient().
+    await assert.doesNotReject(() => monitorMongoDbClient(failingSimpleDao));
+
+    const loggedMessages = logStub.mock.calls.map((call) => String(call.arguments[0]));
+    // The underlying error is logged...
+    assert.equal(loggedMessages.some((message) => message.includes("Could not connect to MongoDB")), true);
+    // ...and then it falls through to the graceful "unable to get client" path and returns.
+    assert.equal(loggedMessages.some((message) => message.includes("Unable to get current MongoDB client")), true);
+  });
+
   it("should not monitor the same MongoDB client twice", async () => {
     const client = new FakeMongoClient(uniqueDatabaseName());
     const logStub = mock.method(console, "log", () => undefined);

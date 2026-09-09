@@ -1,3 +1,4 @@
+import util from "node:util";
 import metrics from "@prometheus-io/client";
 import color from "ansi-colors";
 import {MongoDbClient, SimpleDao} from "./types/external.types";
@@ -109,7 +110,13 @@ function readConfiguredMaxPoolSize(db: MongoDbClient): number {
 }
 
 export async function monitorMongoDbClient(simpleDao: SimpleDao) {
-  const db = await simpleDao.getCurrentClient();
+  let db;
+
+  try {
+    db = await simpleDao.getCurrentClient();
+  } catch (error) {
+    console.log(color.red(util.inspect(error)));
+  }
 
   if (!db) {
     console.log(color.red("[btrz-monitoring] Unable to get current MongoDB client"));

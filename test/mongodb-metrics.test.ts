@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import {EventEmitter} from "node:events";
-import {afterEach, describe, it, mock} from "node:test";
+import {afterEach, beforeEach, describe, it, mock} from "node:test";
 import {register} from "@prometheus-io/client";
 import {monitorMongoDbClient} from "../src/mongodb-metrics";
-import {SimpleDao} from "../src/types/external.types";
+import {BtrzLogger, SimpleDao} from "../src/types/external.types";
 
 // A minimal stand-in for the mongodb driver's MongoClient: it is an EventEmitter that exposes the
 // same `s.options` shape the instrumentation reads, and relays connection pool (CMAP) events.
@@ -21,6 +21,19 @@ function fakeSimpleDao(client: FakeMongoClient | undefined): SimpleDao {
     connect: async () => undefined,
     getCurrentClient: async () => client as any
   };
+}
+
+function fakeLogger(): BtrzLogger {
+  return {
+    debug: mock.fn(),
+    info: mock.fn(),
+    error: mock.fn(),
+    fatal: mock.fn()
+  };
+}
+
+function loggedMessagesFor(method: (...args: any[]) => void): string[] {
+  return (method as any).mock.calls.map((call: any) => String(call.arguments[0]));
 }
 
 async function gaugeValue(name: string, database: string): Promise<number> {
@@ -48,16 +61,23 @@ describe("monitorMongoDbClient()", () => {
     return `test-db-${dbCounter}`;
   }
 
+  let logger: BtrzLogger;
+
+  beforeEach(() => {
+    logger = fakeLogger();
+  });
+
   afterEach(() => {
     mock.restoreAll();
   });
 
   it("should log an error and do nothing when no MongoDB client is available", async () => {
-    const logStub = mock.method(console, "log", () => undefined);
+    await monitorMongoDbClient(fakeSimpleDao(undefined), logger);
 
-    await monitorMongoDbClient(fakeSimpleDao(undefined));
-
-    assert.equal(logStub.mock.calls[0].arguments[0].includes("Unable to get current MongoDB client"), true);
+    assert.equal(
+      loggedMessagesFor(logger.error).some((message) => message.includes("SimpleDao did not return a MongoDB client")),
+      true
+    );
   });
 
   it("should log the error and do nothing when retrieving the MongoDB client rejects", async () => {
@@ -68,36 +88,35 @@ describe("monitorMongoDbClient()", () => {
         throw retrievalError;
       }
     };
-    const logStub = mock.method(console, "log", () => undefined);
 
     // A rejection from getCurrentClient() must not propagate out of monitorMongoDbClient().
-    await assert.doesNotReject(() => monitorMongoDbClient(failingSimpleDao));
+    await assert.doesNotReject(() => monitorMongoDbClient(failingSimpleDao, logger));
 
-    const loggedMessages = logStub.mock.calls.map((call) => String(call.arguments[0]));
-    // The underlying error is logged...
-    assert.equal(loggedMessages.some((message) => message.includes("Could not connect to MongoDB")), true);
-    // ...and then it falls through to the graceful "unable to get client" path and returns.
-    assert.equal(loggedMessages.some((message) => message.includes("Unable to get current MongoDB client")), true);
+    const errorCalls = (logger.error as any).mock.calls;
+    // The retrieval failure is logged, with the underlying error passed through as context
+    assert.equal(
+      errorCalls.some((call: any) =>
+        String(call.arguments[0]).includes("Error retrieving MongoDb client") && call.arguments[1] === retrievalError),
+      true
+    );
   });
 
   it("should not monitor the same MongoDB client twice", async () => {
     const client = new FakeMongoClient(uniqueDatabaseName());
-    const logStub = mock.method(console, "log", () => undefined);
 
-    await monitorMongoDbClient(fakeSimpleDao(client));
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
-    const warned = logStub.mock.calls.some((call) =>
-      String(call.arguments[0]).includes("already being monitored"));
+    const warned = loggedMessagesFor(logger.error).some((message) =>
+      message.includes("already being monitored"));
     assert.equal(warned, true);
   });
 
   it("should label metrics with the database name from the client options by default", async () => {
     const dbName = uniqueDatabaseName();
     const client = new FakeMongoClient(dbName, 25);
-    mock.method(console, "log", () => undefined);
 
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", dbName), 25);
   });
@@ -106,9 +125,8 @@ describe("monitorMongoDbClient()", () => {
     const dbName = uniqueDatabaseName();
     const overrideName = uniqueDatabaseName();
     const client = new FakeMongoClient(dbName, 25);
-    mock.method(console, "log", () => undefined);
 
-    await monitorMongoDbClient(fakeSimpleDao(client), {name: overrideName});
+    await monitorMongoDbClient(fakeSimpleDao(client), logger, {name: overrideName});
 
     // Metrics are labelled with the override name...
     assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", overrideName), 25);
@@ -123,9 +141,8 @@ describe("monitorMongoDbClient()", () => {
   it("should publish the configured maximum pool size", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database, 25);
-    mock.method(console, "log", () => undefined);
 
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", database), 25);
   });
@@ -133,9 +150,8 @@ describe("monitorMongoDbClient()", () => {
   it("should default the maximum pool size to the driver default when it is not configured", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database);
-    mock.method(console, "log", () => undefined);
 
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", database), 100);
   });
@@ -143,8 +159,7 @@ describe("monitorMongoDbClient()", () => {
   it("should track the number of open connections in the pool", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database);
-    mock.method(console, "log", () => undefined);
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     client.emit("connectionCreated", {});
     client.emit("connectionCreated", {});
@@ -157,8 +172,7 @@ describe("monitorMongoDbClient()", () => {
   it("should track the number of connections currently checked out (in use)", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database);
-    mock.method(console, "log", () => undefined);
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     // A normal checkout: started -> checked out.
     client.emit("connectionCheckOutStarted", {});
@@ -174,8 +188,7 @@ describe("monitorMongoDbClient()", () => {
   it("should track operations waiting in the connection pool wait queue", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database);
-    mock.method(console, "log", () => undefined);
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     // Two operations begin waiting for a connection.
     client.emit("connectionCheckOutStarted", {});
@@ -194,8 +207,7 @@ describe("monitorMongoDbClient()", () => {
   it("should count connection checkout failures by reason", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database);
-    mock.method(console, "log", () => undefined);
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     client.emit("connectionCheckOutStarted", {});
     client.emit("connectionCheckOutFailed", {reason: "timeout"});
@@ -211,8 +223,7 @@ describe("monitorMongoDbClient()", () => {
   it("should bucket high-cardinality Error reasons into a single bounded label to protect against series growth", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database);
-    mock.method(console, "log", () => undefined);
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     // The driver emits the raw Error object as the reason when a new connection cannot be
     // established.  Each Error has a distinct, high-cardinality message; they must all collapse
@@ -236,8 +247,7 @@ describe("monitorMongoDbClient()", () => {
   it("should update the maximum pool size when a new connection pool is created", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database, 10);
-    mock.method(console, "log", () => undefined);
-    await monitorMongoDbClient(fakeSimpleDao(client));
+    await monitorMongoDbClient(fakeSimpleDao(client), logger);
 
     assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", database), 10);
 

@@ -1,7 +1,5 @@
-import util from "node:util";
 import metrics from "@prometheus-io/client";
-import color from "ansi-colors";
-import {MongoDbClient, SimpleDao} from "./types/external.types";
+import {BtrzLogger, MongoDbClient, SimpleDao} from "./types/external.types";
 
 const monitoredMongoDbClients = new WeakSet();
 
@@ -113,22 +111,23 @@ interface MongoDBMonitoringOptions {
   name?: string;
 }
 
-export async function monitorMongoDbClient(simpleDao: SimpleDao, options: MongoDBMonitoringOptions = {}) {
+export async function monitorMongoDbClient(simpleDao: SimpleDao, logger: BtrzLogger, options: MongoDBMonitoringOptions = {}) {
   let db;
 
   try {
     db = await simpleDao.getCurrentClient();
   } catch (error) {
-    console.log(color.red(util.inspect(error)));
+    logger.error("Error retrieving MongoDb client", error);
+    return;
   }
 
   if (!db) {
-    console.log(color.red("[btrz-monitoring] Unable to get current MongoDB client"));
+    logger.error("SimpleDao did not return a MongoDB client");
     return;
   }
 
   if (monitoredMongoDbClients.has(db)) {
-    console.log(color.red("[btrz-monitoring] Tried to monitor a MongoDB client that is already being monitored"));
+    logger.error("Tried to monitor a MongoDB client that is already being monitored");
     return;
   }
 
@@ -175,5 +174,5 @@ export async function monitorMongoDbClient(simpleDao: SimpleDao, options: MongoD
     checkOutFailuresTotal.inc({database, reason: normalizeCheckOutFailureReason(event.reason)});
   });
 
-  console.log(color.yellow(`[btrz-monitoring] Monitoring MongoDB connection pool for database "${database}"`));
+  logger.info(`Monitoring MongoDB connection pool for database "${database}"`);
 }

@@ -109,7 +109,11 @@ function readConfiguredMaxPoolSize(db: MongoDbClient): number {
   return typeof optionMax === "number" ? optionMax : DEFAULT_MAX_POOL_SIZE;
 }
 
-export async function monitorMongoDbClient(simpleDao: SimpleDao) {
+interface MongoDBMonitoringOptions {
+  name?: string;
+}
+
+export async function monitorMongoDbClient(simpleDao: SimpleDao, options: MongoDBMonitoringOptions = {}) {
   let db;
 
   try {
@@ -130,7 +134,7 @@ export async function monitorMongoDbClient(simpleDao: SimpleDao) {
 
   monitoredMongoDbClients.add(db);
 
-  const database = db.s.options.dbName;
+  const database = options.name ?? db.s.options.dbName;
 
   // Publish the pool capacity, and ensure the utilization/queue series exist immediately with a
   // value of 0 so that dashboards render before the first connection event is observed.

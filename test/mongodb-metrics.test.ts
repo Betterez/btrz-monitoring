@@ -92,6 +92,34 @@ describe("monitorMongoDbClient()", () => {
     assert.equal(warned, true);
   });
 
+  it("should label metrics with the database name from the client options by default", async () => {
+    const dbName = uniqueDatabaseName();
+    const client = new FakeMongoClient(dbName, 25);
+    mock.method(console, "log", () => undefined);
+
+    await monitorMongoDbClient(fakeSimpleDao(client));
+
+    assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", dbName), 25);
+  });
+
+  it("should override the database label with the provided options.name", async () => {
+    const dbName = uniqueDatabaseName();
+    const overrideName = uniqueDatabaseName();
+    const client = new FakeMongoClient(dbName, 25);
+    mock.method(console, "log", () => undefined);
+
+    await monitorMongoDbClient(fakeSimpleDao(client), {name: overrideName});
+
+    // Metrics are labelled with the override name...
+    assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", overrideName), 25);
+    client.emit("connectionCreated", {});
+    assert.equal(await gaugeValue("mongodb_client_connection_pool_size", overrideName), 1);
+
+    // ...and not with the underlying client's dbName.
+    assert.equal(await gaugeValue("mongodb_client_connection_pool_max_size", dbName), 0);
+    assert.equal(await gaugeValue("mongodb_client_connection_pool_size", dbName), 0);
+  });
+
   it("should publish the configured maximum pool size", async () => {
     const database = uniqueDatabaseName();
     const client = new FakeMongoClient(database, 25);

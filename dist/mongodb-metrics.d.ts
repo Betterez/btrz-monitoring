@@ -1,2 +1,6 @@
 import { SimpleDao } from "./types/external.types";
-export declare function monitorMongoDbClient(simpleDao: SimpleDao): Promise<void>;
+interface MongoDBMonitoringOptions {
+    name?: string;
+}
+export declare function monitorMongoDbClient(simpleDao: SimpleDao, options?: MongoDBMonitoringOptions): Promise<void>;
+export {};

@@ -4,9 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.monitorMongoDbClient = monitorMongoDbClient;
-const node_util_1 = __importDefault(require("node:util"));
 const client_1 = __importDefault(require("@prometheus-io/client"));
-const ansi_colors_1 = __importDefault(require("ansi-colors"));
 const monitoredMongoDbClients = new WeakSet();
 const DEFAULT_MAX_POOL_SIZE = 100;
 /**
@@ -98,20 +96,21 @@ function readConfiguredMaxPoolSize(db) {
     const optionMax = db.s.options.maxPoolSize ?? db.s.options.poolSize;
     return typeof optionMax === "number" ? optionMax : DEFAULT_MAX_POOL_SIZE;
 }
-async function monitorMongoDbClient(simpleDao, options = {}) {
+async function monitorMongoDbClient(simpleDao, logger, options = {}) {
     let db;
     try {
         db = await simpleDao.getCurrentClient();
     }
     catch (error) {
-        console.log(ansi_colors_1.default.red(node_util_1.default.inspect(error)));
+        logger.error("Error retrieving MongoDb client", error);
+        return;
     }
     if (!db) {
-        console.log(ansi_colors_1.default.red("[btrz-monitoring] Unable to get current MongoDB client"));
+        logger.error("SimpleDao did not return a MongoDB client");
         return;
     }
     if (monitoredMongoDbClients.has(db)) {
-        console.log(ansi_colors_1.default.red("[btrz-monitoring] Tried to monitor a MongoDB client that is already being monitored"));
+        logger.error("Tried to monitor a MongoDB client that is already being monitored");
         return;
     }
     monitoredMongoDbClients.add(db);
@@ -149,6 +148,6 @@ async function monitorMongoDbClient(simpleDao, options = {}) {
         waitQueueSize.dec({ database });
         checkOutFailuresTotal.inc({ database, reason: normalizeCheckOutFailureReason(event.reason) });
     });
-    console.log(ansi_colors_1.default.yellow(`[btrz-monitoring] Monitoring MongoDB connection pool for database "${database}"`));
+    logger.info(`Monitoring MongoDB connection pool for database "${database}"`);
 }
 //# sourceMappingURL=mongodb-metrics.js.map
